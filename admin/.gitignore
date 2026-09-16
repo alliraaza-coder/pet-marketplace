@@ -1,0 +1,22 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary/test files
+test.php
+test_pd.php
+db_audit.php
+migration_runner.php
