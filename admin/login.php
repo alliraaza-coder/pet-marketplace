@@ -7,6 +7,7 @@ redirect_if_logged_in();
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
     $email    = sanitize_input($_POST['email']);
     $password = $_POST['password'];
 
@@ -24,9 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($user['is_deleted'])) {
                 $error = "Your account has been deactivated.";
             } elseif (password_verify($password, $user['password'])) {
-                $_SESSION['user_id']   = $user['id'];
-                $_SESSION['user_role'] = $user['role'];
-                $_SESSION['user_name'] = $user['first_name'];
+                // Regenerate session ID to prevent fixation
+                secure_login($user['id'], $user['role'], $user['first_name']);
                 
                 log_admin_activity($conn, $user['id'], 'Admin Login', 'Logged in successfully.');
 
@@ -92,9 +92,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php display_messages(); ?>
 
                     <form action="login.php" method="POST">
+                        <?php csrf_field(); ?>
                         <div class="mb-3">
                             <label for="email" class="form-label text-muted">Admin Email</label>
-                            <input type="email" class="form-control bg-dark text-white border-secondary" id="email" name="email" required value="admin@petmarket.com">
+                            <input type="email" class="form-control bg-dark text-white border-secondary" id="email" name="email" required placeholder="admin@example.com">
                         </div>
                         <div class="mb-4">
                             <label for="password" class="form-label text-muted">Password</label>

@@ -14,6 +14,7 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
     $current_password = $_POST['current_password'] ?? '';
     $new_password     = $_POST['new_password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
@@ -84,6 +85,7 @@ $page_title = "Change Password - " . $site_settings['site_name'];
                     <?php display_messages(); ?>
 
                     <form action="change_password.php" method="POST">
+                        <?php csrf_field(); ?>
                         <div class="mb-3">
                             <label class="form-label text-muted">Current Password</label>
                             <input type="password" name="current_password" class="form-control bg-dark text-white border-secondary" placeholder="Enter current password (if set)" required>

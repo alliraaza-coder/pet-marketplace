@@ -8,8 +8,16 @@ require_once '../includes/auth.php';
 
 require_role('seller');
 
+// Delete must be a POST action (prevent CSRF via GET links)
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $_SESSION['error'] = 'Invalid request method.';
+    header('Location: products.php');
+    exit;
+}
+verify_csrf();
+
 $seller_id  = (int)$_SESSION['user_id'];
-$product_id = (int)($_GET['id'] ?? 0);
+$product_id = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
 
 if (!$product_id) {
     $_SESSION['error'] = 'Invalid product.';

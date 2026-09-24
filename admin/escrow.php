@@ -13,6 +13,7 @@ $admin_id = $_SESSION['user_id'];
 
 // ─── 2. POST ACTION HANDLING (must be before ANY output) ────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['order_id'])) {
+    verify_csrf();
     $action   = sanitize_input($_POST['action']);
     $order_id = (int)$_POST['order_id'];
 
@@ -338,6 +339,7 @@ include __DIR__ . '/partials/header.php';
                             <td class="pe-4 text-end">
                                 <div class="d-flex justify-content-end gap-2">
                                     <form action="escrow.php" method="POST" onsubmit="return confirm('Approve payment and activate escrow? Seller will now see this order.');">
+                                        <?php csrf_field(); ?>
                                         <input type="hidden" name="action" value="approve_payment">
                                         <input type="hidden" name="order_id" value="<?php echo $p['id']; ?>">
                                         <button type="submit" class="btn btn-sm btn-success fw-bold rounded-pill">
@@ -345,6 +347,7 @@ include __DIR__ . '/partials/header.php';
                                         </button>
                                     </form>
                                     <form action="escrow.php" method="POST" onsubmit="return confirm('Reject this payment? Buyer will need to resubmit.');">
+                                        <?php csrf_field(); ?>
                                         <input type="hidden" name="action" value="reject_payment">
                                         <input type="hidden" name="order_id" value="<?php echo $p['id']; ?>">
                                         <button type="submit" class="btn btn-sm btn-danger fw-bold rounded-pill">
@@ -439,6 +442,7 @@ include __DIR__ . '/partials/header.php';
                                     <?php if ($sd && $br && !$av): ?>
                                     <!-- VERIFY DELIVERY button -->
                                     <form action="escrow.php" method="POST" onsubmit="return confirm('Verify delivery for this order? This will allow you to release payment.');">
+                                        <?php csrf_field(); ?>
                                         <input type="hidden" name="action" value="verify">
                                         <input type="hidden" name="order_id" value="<?php echo $o['id']; ?>">
                                         <button type="submit" class="btn btn-sm btn-primary fw-bold rounded-pill">
@@ -450,6 +454,7 @@ include __DIR__ . '/partials/header.php';
                                     <?php if ($sd && $br && $av): ?>
                                     <!-- RELEASE PAYMENT button (all conditions met) -->
                                     <form action="escrow.php" method="POST" onsubmit="return confirm('CONFIRM: Release payment to seller? This action cannot be undone.');">
+                                        <?php csrf_field(); ?>
                                         <input type="hidden" name="action" value="release">
                                         <input type="hidden" name="order_id" value="<?php echo $o['id']; ?>">
                                         <button type="submit" class="btn btn-sm btn-success fw-bold rounded-pill">
@@ -460,6 +465,7 @@ include __DIR__ . '/partials/header.php';
 
                                     <!-- REFUND button (always available while in escrow) -->
                                     <form action="escrow.php" method="POST" onsubmit="return confirm('Refund buyer and cancel order? Stock will be restored.');">
+                                        <?php csrf_field(); ?>
                                         <input type="hidden" name="action" value="refund">
                                         <input type="hidden" name="order_id" value="<?php echo $o['id']; ?>">
                                         <button type="submit" class="btn btn-sm btn-outline-danger fw-bold rounded-pill">

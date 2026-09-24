@@ -9,6 +9,7 @@ $user = current_user($conn);
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
     $first_name = sanitize_input($_POST['first_name']);
     $last_name = sanitize_input($_POST['last_name']);
     $phone = sanitize_input($_POST['phone']);
@@ -70,6 +71,7 @@ include '../includes/header.php';
                 </div>
                 <div class="card-body p-4">
                     <form action="profile.php" method="POST">
+                        <?php csrf_field(); ?>
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label for="first_name" class="form-label fw-medium">First Name <span class="text-danger">*</span></label>

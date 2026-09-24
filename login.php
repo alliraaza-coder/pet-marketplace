@@ -8,6 +8,7 @@ redirect_if_logged_in();
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
     $email = sanitize_input($_POST['email']);
     $password = $_POST['password'];
 
@@ -28,12 +29,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = "Your account is inactive. Please verify your email.";
             } else {
                 if (password_verify($password, $user['password'])) {
-                    // Password is correct, start session
-                    $_SESSION['user_id'] = $user['id'];
-                    $_SESSION['user_role'] = $user['role'];
-                    $_SESSION['user_name'] = $user['first_name'];
+                    // Regenerate session ID to prevent session fixation
+                    secure_login($user['id'], $user['role'], $user['first_name']);
                     
-                    $_SESSION['success'] = "Welcome back, " . $user['first_name'] . "!";
+                    $_SESSION['success'] = "Welcome back, " . htmlspecialchars($user['first_name']) . "!";
                     
                     // Redirect based on role
                     if ($user['role'] === 'seller') {
@@ -73,6 +72,7 @@ include 'includes/header.php';
                     <?php display_messages(); ?>
 
                     <form action="login.php" method="POST">
+                        <?php csrf_field(); ?>
                         <div class="mb-3">
                             <label for="email" class="form-label fw-medium">Email Address</label>
                             <div class="input-group">

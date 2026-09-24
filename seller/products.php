@@ -228,12 +228,7 @@ include '../includes/header.php';
                                                title="Edit">
                                                 <i class="bi bi-pencil"></i>
                                             </a>
-                                            <a href="delete_product.php?id=<?php echo $p['id']; ?>"
-                                               class="btn btn-outline-danger rounded-end"
-                                               title="Delete"
-                                               onclick="return confirmDelete('<?php echo htmlspecialchars(addslashes($p['title_en'])); ?>')">
-                                                <i class="bi bi-trash"></i>
-                                            </a>
+                                            <form action="delete_product.php" method="POST" class="d-inline" onsubmit="return confirm('Permanently delete this product?');"><?php csrf_field(); ?><input type="hidden" name="id" value="<?php echo $p['id']; ?>"><button type="submit" class="btn btn-outline-danger rounded-end" title="Delete"><i class="bi bi-trash"></i></button></form>
                                         </div>
                                     </td>
                                 </tr>
@@ -308,3 +303,4 @@ function confirmDelete(name) {
 </script>
 
 <?php include '../includes/footer.php'; ?>
+

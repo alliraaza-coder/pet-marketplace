@@ -67,10 +67,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['buyer_action'])) {
 
         if (isset($_FILES['payment_proof']) && $_FILES['payment_proof']['error'] === UPLOAD_ERR_OK) {
             $upload_dir = '../assets/images/payments/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-            $ext = pathinfo($_FILES['payment_proof']['name'], PATHINFO_EXTENSION);
-            $filename = 'proof_' . $order_id . '_' . time() . '.' . $ext;
-            if (move_uploaded_file($_FILES['payment_proof']['tmp_name'], $upload_dir . $filename)) {
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            
+            $allowed_mime  = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+            $allowed_ext   = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+            $max_size      = 5 * 1024 * 1024; // 5 MB
+            
+            $tmp_file = $_FILES['payment_proof']['tmp_name'];
+            $orig_name = $_FILES['payment_proof']['name'];
+            $file_size = $_FILES['payment_proof']['size'];
+            
+            $real_mime = mime_content_type($tmp_file);
+            $ext = strtolower(pathinfo($orig_name, PATHINFO_EXTENSION));
+            
+            if (!in_array($real_mime, $allowed_mime)) {
+                $_SESSION['error'] = "Invalid file type. Only JPG, PNG, WEBP, GIF images are accepted.";
+                header("Location: order_details.php?id=$order_id");
+                exit;
+            }
+            if (!in_array($ext, $allowed_ext)) {
+                $_SESSION['error'] = "Invalid file extension.";
+                header("Location: order_details.php?id=$order_id");
+                exit;
+            }
+            if ($file_size > $max_size) {
+                $_SESSION['error'] = "File size exceeds 5MB limit.";
+                header("Location: order_details.php?id=$order_id");
+                exit;
+            }
+            
+            $filename = 'proof_' . $order_id . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+            if (move_uploaded_file($tmp_file, $upload_dir . $filename)) {
                 $proof_path = 'payments/' . $filename;
             }
         }

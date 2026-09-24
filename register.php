@@ -8,6 +8,7 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
     $first_name = sanitize_input($_POST['first_name']);
     $last_name = sanitize_input($_POST['last_name']);
     $email = sanitize_input($_POST['email']);
@@ -69,6 +70,7 @@ include 'includes/header.php';
                     <?php endif; ?>
 
                     <form action="register.php" method="POST">
+                        <?php csrf_field(); ?>
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label for="first_name" class="form-label fw-medium">First Name <span class="text-danger">*</span></label>

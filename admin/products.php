@@ -11,6 +11,7 @@ $admin_id = $_SESSION['user_id'];
 
 // Handle Actions (Approve, Reject, Feature, Unfeature, Soft Delete)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['product_id'])) {
+    verify_csrf();
     $action     = sanitize_input($_POST['action']);
     $product_id = (int)$_POST['product_id'];
 
@@ -287,4 +288,5 @@ $products = $stmt->get_result();
 </div>
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
+
 
