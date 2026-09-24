@@ -98,8 +98,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $weight         = trim($_POST['weight'] ?? '');
     $city           = trim($_POST['city'] ?? '');
     $listing_type   = ($_POST['listing_type'] ?? 'store') === 'market' ? 'market' : 'store';
-    $status         = in_array($_POST['status'] ?? '', ['active','pending','inactive','sold'])
-                      ? $_POST['status'] : 'pending';
+    // Seller can only mark as 'sold', cannot change back, cannot activate/deactivate
+    $status = $product['status'];
+    if (isset($_POST['status']) && $_POST['status'] === 'sold') {
+        $status = 'sold';
+    }
     $is_featured    = isset($_POST['is_featured'])   ? 1 : 0;
     $is_negotiable  = isset($_POST['is_negotiable'])  ? 1 : 0;
     $vaccination    = isset($_POST['vaccination_status']) ? 1 : 0;
@@ -155,7 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  WHERE id = ? AND seller_id = ?"
             );
             $upd->bind_param(
-                'iissddiissssssiiiisii',
+                'iissddisssssssiiiisii',
                 $category_id, $subcategory_id,
                 $title_en, $description_en,
                 $price, $discount_price, $stock,
@@ -428,11 +431,20 @@ include '../includes/header.php';
                             <div class="card-body px-4 pb-4">
                                 <div class="mb-3">
                                     <label class="form-label fw-medium">Product Status</label>
-                                    <select name="status" class="form-select rounded-3">
-                                        <?php foreach (['active'=>'Active (Visible)','pending'=>'Pending Review','inactive'=>'Inactive','sold'=>'Sold Out'] as $val => $lbl): ?>
-                                            <option value="<?php echo $val; ?>" <?php echo ($product['status'] === $val) ? 'selected' : ''; ?>><?php echo $lbl; ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                    
+                                    <?php if ($product['status'] === 'sold'): ?>
+                                        <div class="alert alert-secondary py-2 mb-0">
+                                            <i class="bi bi-info-circle me-1"></i> Sold Out (Cannot be changed)
+                                        </div>
+                                        <input type="hidden" name="status" value="sold">
+                                    <?php else: ?>
+                                        <select name="status" class="form-select rounded-3">
+                                            <option value="<?php echo $product['status']; ?>">Keep Current Status (<?php echo ucfirst($product['status']); ?>)</option>
+                                            <option value="sold">Mark as Sold Out</option>
+                                        </select>
+                                        <div class="form-text text-muted small mt-2">You can only mark the product as Sold Out. Admin approval is required for activation.</div>
+                                    <?php endif; ?>
+                                    
                                 </div>
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" role="switch"

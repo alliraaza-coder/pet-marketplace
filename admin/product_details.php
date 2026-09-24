@@ -12,8 +12,44 @@ $admin_id = $_SESSION['user_id'];
 $product_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 if (!$product_id) {
-    $_SESSION['error'] = "Invalid product ID.";
-    header('Location: products.php');
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['product_id'])) {
+        $product_id = (int)$_POST['product_id'];
+    } else {
+        $_SESSION['error'] = "Invalid product ID.";
+        header('Location: products.php');
+        exit;
+    }
+}
+
+// Handle Actions
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['product_id'])) {
+    $action = sanitize_input($_POST['action']);
+    
+    if ($action === 'approve') {
+        $stmt = $conn->prepare("UPDATE products SET status = 'active' WHERE id = ?");
+        $stmt->bind_param("i", $product_id);
+        if ($stmt->execute()) {
+            log_admin_activity($conn, $admin_id, "Approved Product", "Approved Product ID: $product_id");
+            $_SESSION['success'] = "Product approved and activated.";
+        }
+    } elseif ($action === 'reject') {
+        $stmt = $conn->prepare("UPDATE products SET status = 'inactive' WHERE id = ?");
+        $stmt->bind_param("i", $product_id);
+        if ($stmt->execute()) {
+            log_admin_activity($conn, $admin_id, "Rejected Product", "Rejected/Hid Product ID: $product_id");
+            $_SESSION['success'] = "Product rejected/hidden successfully.";
+        }
+    } elseif ($action === 'delete') {
+        $stmt = $conn->prepare("UPDATE products SET is_deleted = 1, deleted_at = NOW() WHERE id = ?");
+        $stmt->bind_param("i", $product_id);
+        if ($stmt->execute()) {
+            log_admin_activity($conn, $admin_id, "Soft Deleted Product", "Soft deleted Product ID: $product_id");
+            $_SESSION['success'] = "Product soft deleted successfully.";
+            header('Location: products.php');
+            exit;
+        }
+    }
+    header("Location: product_details.php?id=$product_id");
     exit;
 }
 
@@ -45,21 +81,21 @@ include __DIR__ . '/partials/header.php';
 <div class="mb-4 d-flex justify-content-between align-items-center">
     <a href="products.php" class="text-decoration-none text-muted"><i class="bi bi-arrow-left me-1"></i> Back to Products</a>
     <div>
-        <?php if ($product['status'] === 'pending' || $product['status'] === 'inactive'): ?>
-            <form action="products.php" method="POST" class="d-inline">
+        <?php if ($product['status'] === 'pending' || $product['status'] === 'inactive' || $product['status'] === 'sold'): ?>
+            <form action="product_details.php" method="POST" class="d-inline">
                 <input type="hidden" name="action" value="approve">
                 <input type="hidden" name="product_id" value="<?php echo $product['id']; ?>">
                 <button type="submit" class="btn btn-success fw-bold rounded-pill px-4"><i class="bi bi-check-circle me-1"></i> Approve / Activate</button>
             </form>
         <?php endif; ?>
         <?php if ($product['status'] === 'active'): ?>
-            <form action="products.php" method="POST" class="d-inline">
+            <form action="product_details.php" method="POST" class="d-inline">
                 <input type="hidden" name="action" value="reject">
                 <input type="hidden" name="product_id" value="<?php echo $product['id']; ?>">
                 <button type="submit" class="btn btn-warning fw-bold rounded-pill px-4"><i class="bi bi-x-circle me-1"></i> Reject / Hide</button>
             </form>
         <?php endif; ?>
-        <form action="products.php" method="POST" class="d-inline ms-2">
+        <form action="product_details.php" method="POST" class="d-inline ms-2">
             <input type="hidden" name="action" value="delete">
             <input type="hidden" name="product_id" value="<?php echo $product['id']; ?>">
             <button type="submit" class="btn btn-outline-danger fw-bold rounded-pill px-4" onclick="return confirm('Soft delete this product?');"><i class="bi bi-trash me-1"></i> Delete</button>

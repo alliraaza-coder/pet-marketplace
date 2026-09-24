@@ -37,6 +37,12 @@ if (!$order) {
     exit;
 }
 
+if (in_array($order['payment_status'], ['pending', 'payment_submitted', 'rejected'])) {
+    $_SESSION['error'] = "This order is not yet visible. Awaiting Admin payment verification.";
+    header('Location: orders.php');
+    exit;
+}
+
 // 2. Fetch specific items from this order that belong to this seller
 $item_stmt = $conn->prepare("
     SELECT oi.*, p.title_en, p.breed, p.listing_type,
@@ -57,6 +63,12 @@ foreach ($order_items as $item) {
 
 // Handle Order Workflow Updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['workflow_action'])) {
+    if (in_array($order['order_status'], ['cancelled', 'completed', 'delivered'])) {
+        $_SESSION['error'] = "Action not allowed for current order status.";
+        header("Location: order_details.php?id=$order_id");
+        exit;
+    }
+
     $action = sanitize_input($_POST['workflow_action']);
     $new_status = '';
     

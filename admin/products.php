@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Admin Products Management
  * Phase 3.3
@@ -211,7 +211,7 @@ $products = $stmt->get_result();
                                             <li><a class="dropdown-item" href="product_details.php?id=<?php echo $p['id']; ?>"><i class="bi bi-eye me-2"></i> View Details</a></li>
                                             <li><hr class="dropdown-divider"></li>
                                             
-                                            <?php if ($p['status'] === 'pending' || $p['status'] === 'inactive'): ?>
+                                            <?php if ($p['status'] === 'pending' || $p['status'] === 'inactive' || $p['status'] === 'sold'): ?>
                                                 <li>
                                                     <form action="products.php" method="POST" class="d-inline">
                                                         <input type="hidden" name="action" value="approve">

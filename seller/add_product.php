@@ -37,8 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $weight        = trim($_POST['weight'] ?? '');
     $city          = trim($_POST['city'] ?? $user['city'] ?? '');
     $listing_type  = ($_POST['listing_type'] ?? 'store') === 'market' ? 'market' : 'store';
-    $status        = in_array($_POST['status'] ?? '', ['active','pending','inactive'])
-                     ? $_POST['status'] : 'pending';
+    $status        = 'pending'; // Always pending on creation
     $is_featured   = isset($_POST['is_featured'])   ? 1 : 0;
     $is_negotiable = isset($_POST['is_negotiable'])  ? 1 : 0;
     $vaccination   = isset($_POST['vaccination_status']) ? 1 : 0;
@@ -103,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
             );
             $ins->bind_param(
-                'iiisssddisssssssiiiii',
+                'iiisssddisssssssiiiis',
                 $seller_id, $category_id, $subcategory_id,
                 $title_en, $slug, $description_en,
                 $price, $discount_price, $stock,
@@ -125,7 +124,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $conn->commit();
-            $_SESSION['success'] = 'Product listed successfully! It is now ' . ucfirst($status) . '.';
+            
+            // Notify Admin
+            $admin_msg = "Seller " . $user['first_name'] . " added a new product: " . $title_en;
+            $notif_stmt = $conn->prepare("INSERT INTO admin_notifications (type, title, message, link) VALUES ('new_product', 'New Product Requires Approval', ?, 'products.php?status=pending')");
+            $notif_stmt->bind_param("s", $admin_msg);
+            $notif_stmt->execute();
+            
+            $_SESSION['success'] = 'Product listed successfully! It is currently Pending Approval by an admin.';
             header('Location: products.php');
             exit;
 
@@ -368,18 +374,10 @@ include '../includes/header.php';
                             <div class="card-body px-4 pb-4">
                                 <div class="mb-3">
                                     <label class="form-label fw-medium">Product Status</label>
-                                    <select name="status" class="form-select rounded-3">
-                                        <option value="pending" <?php echo (($old['status'] ?? 'pending') === 'pending') ? 'selected' : ''; ?>>
-                                            Pending Review
-                                        </option>
-                                        <option value="active" <?php echo (($old['status'] ?? '') === 'active') ? 'selected' : ''; ?>>
-                                            Active (Visible)
-                                        </option>
-                                        <option value="inactive" <?php echo (($old['status'] ?? '') === 'inactive') ? 'selected' : ''; ?>>
-                                            Inactive (Hidden)
-                                        </option>
-                                    </select>
-                                    <div class="form-text">Pending products require admin approval.</div>
+                                    <div>
+                                        <span class="badge bg-warning text-dark px-3 py-2 fs-6">Pending Review</span>
+                                    </div>
+                                    <div class="form-text mt-2">New products require admin approval before becoming active.</div>
                                 </div>
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" role="switch"

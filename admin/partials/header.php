@@ -53,6 +53,45 @@ if (!empty($user['force_password_change']) && basename($_SERVER['PHP_SELF']) !==
                     <a class="btn btn-outline-secondary btn-sm rounded-pill px-3" href="../index.php" target="_blank">
                         <i class="bi bi-box-arrow-up-right me-1"></i> View Website
                     </a>
+
+                    <?php
+                    // Fetch unread notifications
+                    $notif_q = $conn->query("SELECT * FROM admin_notifications WHERE is_read = 0 ORDER BY created_at DESC LIMIT 5");
+                    $unread_count = $conn->query("SELECT COUNT(*) AS cnt FROM admin_notifications WHERE is_read = 0")->fetch_assoc()['cnt'];
+                    ?>
+                    <div class="dropdown">
+                        <button class="btn btn-light btn-sm rounded-circle position-relative p-2" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="width:36px;height:36px;">
+                            <i class="bi bi-bell"></i>
+                            <?php if ($unread_count > 0): ?>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.65rem;">
+                                <?php echo $unread_count > 99 ? '99+' : $unread_count; ?>
+                            </span>
+                            <?php endif; ?>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-lg" style="width: 320px;">
+                            <li><h6 class="dropdown-header fw-bold text-dark d-flex justify-content-between align-items-center">
+                                Notifications
+                                <?php if ($unread_count > 0): ?>
+                                    <a href="read_notif.php?action=read_all" class="text-decoration-none text-primary" style="font-size: 0.8rem;">Mark all read</a>
+                                <?php endif; ?>
+                            </h6></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <?php if ($unread_count == 0): ?>
+                                <li><a class="dropdown-item text-center text-muted small py-3" href="#">No new notifications</a></li>
+                            <?php else: ?>
+                                <?php while($notif = $notif_q->fetch_assoc()): ?>
+                                    <li>
+                                        <a class="dropdown-item py-2" href="read_notif.php?id=<?php echo $notif['id']; ?>">
+                                            <div class="fw-bold" style="font-size: 0.85rem;"><?php echo htmlspecialchars($notif['title']); ?></div>
+                                            <div class="text-muted text-wrap" style="font-size: 0.8rem;"><?php echo htmlspecialchars($notif['message']); ?></div>
+                                            <div class="text-secondary mt-1" style="font-size: 0.7rem;"><i class="bi bi-clock me-1"></i><?php echo date('d M H:i', strtotime($notif['created_at'])); ?></div>
+                                        </a>
+                                    </li>
+                                <?php endwhile; ?>
+                            <?php endif; ?>
+                        </ul>
+                    </div>
+
                     <div class="dropdown">
                         <button class="btn btn-light btn-sm rounded-pill dropdown-toggle px-3 border" type="button" data-bs-toggle="dropdown">
                             <i class="bi bi-person-circle me-1"></i> <?php echo htmlspecialchars($user['first_name']); ?>

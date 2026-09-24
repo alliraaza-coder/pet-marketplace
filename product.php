@@ -16,7 +16,7 @@ $query = "SELECT p.*, c.name_en AS category_name, u.first_name, u.last_name, u.c
           FROM products p 
           JOIN categories c ON p.category_id = c.id 
           JOIN users u ON p.seller_id = u.id 
-          WHERE (p.slug = ? OR p.id = ?) AND p.status = 'active'";
+          WHERE (p.slug = ? OR p.id = ?) AND p.status = 'active' AND p.is_deleted = 0";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("si", $slug, $product_id);
 $stmt->execute();

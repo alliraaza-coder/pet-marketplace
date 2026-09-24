@@ -29,17 +29,8 @@ if (!$product) {
     exit;
 }
 
-// ── Delete image files from disk ─────────────────────────────
-$img_res = $conn->query("SELECT image_url FROM product_images WHERE product_id = $product_id");
-while ($img = $img_res->fetch_assoc()) {
-    $path = '../assets/uploads/products/' . $img['image_url'];
-    if (file_exists($path)) {
-        @unlink($path);
-    }
-}
-
-// ── Delete from database (ON DELETE CASCADE handles product_images) ──
-$del = $conn->prepare("DELETE FROM products WHERE id = ? AND seller_id = ?");
+// ── Soft delete from database ──
+$del = $conn->prepare("UPDATE products SET is_deleted = 1, deleted_at = NOW() WHERE id = ? AND seller_id = ?");
 $del->bind_param('ii', $product_id, $seller_id);
 $del->execute();
 

@@ -22,7 +22,7 @@ $per_page      = 10;
 $offset        = ($page - 1) * $per_page;
 
 // ── Build query ───────────────────────────────────────────────
-$where  = "WHERE oi.seller_id = ? AND o.payment_status != 'pending'";
+$where  = "WHERE oi.seller_id = ? AND o.payment_status NOT IN ('pending', 'payment_submitted', 'rejected')";
 $params = [$seller_id];
 $types  = 'i';
 

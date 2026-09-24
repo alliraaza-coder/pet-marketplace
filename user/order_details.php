@@ -47,7 +47,7 @@ $order_items = $item_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['buyer_action'])) {
     $action = sanitize_input($_POST['buyer_action']);
     
-    if ($action === 'cancel' && in_array($order['order_status'], ['pending', 'pending_payment'])) {
+    if ($action === 'cancel' && in_array($order['order_status'], ['pending', 'pending_payment']) && in_array($order['payment_status'], ['pending', 'rejected'])) {
         $upd_stmt = $conn->prepare("UPDATE orders SET order_status = 'cancelled' WHERE id = ?");
         $upd_stmt->bind_param("i", $order_id);
         if ($upd_stmt->execute()) {
@@ -204,7 +204,7 @@ include '../includes/header.php';
                                           <i class="bi bi-x-circle me-1"></i>Cancel Order
                                       </button>
                                   </form>
-                              <?php elseif (in_array($order['order_status'], ['pending', 'pending_payment'])): ?>
+                              <?php elseif (in_array($order['order_status'], ['pending', 'pending_payment']) && in_array($order['payment_status'], ['pending', 'rejected'])): ?>
                                   <form action="" method="POST" class="mt-3 text-center">
                                       <button type="submit" name="buyer_action" value="cancel" class="btn btn-outline-danger btn-sm rounded-pill px-4 fw-bold" onclick="return confirm('Are you sure you want to cancel this order?');">
                                           <i class="bi bi-x-circle me-1"></i>Cancel Order

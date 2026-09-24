@@ -20,7 +20,7 @@ $per_page   = 10;
 $offset     = ($page - 1) * $per_page;
 
 // ── Build Query ───────────────────────────────────────────
-$where  = 'WHERE p.seller_id = ?';
+$where  = 'WHERE p.seller_id = ? AND p.is_deleted = 0';
 $params = [$seller_id];
 $types  = 'i';
 
@@ -66,7 +66,7 @@ $products = $stmt->get_result();
 
 // Product counts for quick filter tabs
 $tab_stmt = $conn->prepare(
-    "SELECT status, COUNT(*) AS cnt FROM products WHERE seller_id = ? GROUP BY status"
+    "SELECT status, COUNT(*) AS cnt FROM products WHERE seller_id = ? AND is_deleted = 0 GROUP BY status"
 );
 $tab_stmt->bind_param('i', $seller_id);
 $tab_stmt->execute();
