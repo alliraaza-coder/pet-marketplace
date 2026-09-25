@@ -137,144 +137,51 @@ include __DIR__ . '/partials/header.php';
 
     <!-- Metrics & Listings -->
     <div class="col-lg-8">
-        <!-- Metrics Row -->
-        <div class="row g-4 mb-4">
+                <!-- Metrics Row -->
+        <div class="row g-3 mb-4">
             <div class="col-sm-6 col-md-3">
-                <div class="card border-0 shadow-sm bg-white p-3 h-100 text-center rounded-4">
-                    <div class="text-secondary mb-2"><i class="bi bi-box-seam fs-2"></i></div>
-                    <h3 class="fw-bold mb-0"><?php echo number_format($metrics['total_products']); ?></h3>
-                    <small class="text-muted">Products</small>
+                <div class="card border-0 shadow-sm bg-primary text-white p-3 h-100 rounded-4 text-center">
+                    <h6 class="text-white-50 mb-1">Products Sold</h6>
+                    <h4 class="fw-bold mb-0"><?php echo number_format($metrics['products_sold']); ?></h4>
                 </div>
             </div>
             <div class="col-sm-6 col-md-3">
-                <div class="card border-0 shadow-sm bg-white p-3 h-100 text-center rounded-4">
-                    <div class="text-primary mb-2"><i class="bi bi-cart fs-2"></i></div>
-                    <h3 class="fw-bold mb-0"><?php echo number_format($metrics['total_orders']); ?></h3>
-                    <small class="text-muted">Orders</small>
+                <div class="card border-0 shadow-sm bg-success text-white p-3 h-100 rounded-4 text-center">
+                    <h6 class="text-white-50 mb-1">Total Sales</h6>
+                    <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['total_sales'], 0); ?></h4>
                 </div>
             </div>
             <div class="col-sm-6 col-md-3">
-                <div class="card border-0 shadow-sm bg-warning text-dark p-3 h-100 text-center rounded-4">
-                    <div class="text-dark-50 mb-2"><i class="bi bi-hourglass-split fs-2"></i></div>
-                    <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['pending_earnings'], 0); ?></h4>
-                    <small class="text-dark-50">Pending Escrow</small>
+                <div class="card border-0 shadow-sm bg-info text-white p-3 h-100 rounded-4 text-center">
+                    <h6 class="text-white-50 mb-1">Payments Sent</h6>
+                    <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['payments_sent'], 0); ?></h4>
                 </div>
             </div>
             <div class="col-sm-6 col-md-3">
-                <div class="card border-0 shadow-sm bg-success text-white p-3 h-100 text-center rounded-4">
-                    <div class="text-white-50 mb-2"><i class="bi bi-wallet2 fs-2"></i></div>
-                    <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['released_earnings'], 0); ?></h4>
-                    <small class="text-white-50">Released Earnings</small>
+                <div class="card border-0 shadow-sm bg-warning text-dark p-3 h-100 rounded-4 text-center">
+                    <h6 class="text-dark-50 mb-1">Payments Pending</h6>
+                    <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['payments_pending'], 0); ?></h4>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <div class="card border-0 shadow-sm bg-white border p-3 h-100 rounded-4 text-center">
+                    <h6 class="text-muted mb-1">Completed Orders</h6>
+                    <h4 class="fw-bold mb-0"><?php echo number_format($metrics['completed_orders']); ?></h4>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <div class="card border-0 shadow-sm bg-white border p-3 h-100 rounded-4 text-center">
+                    <h6 class="text-muted mb-1">Cancelled Orders</h6>
+                    <h4 class="fw-bold mb-0"><?php echo number_format($metrics['cancelled_orders']); ?></h4>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <div class="card border-0 shadow-sm bg-white border p-3 h-100 rounded-4 text-center">
+                    <h6 class="text-muted mb-1">Refunded Orders</h6>
+                    <h4 class="fw-bold mb-0"><?php echo number_format($metrics['refunded_orders']); ?></h4>
                 </div>
             </div>
         </div>
-
-        <!-- Recent Products Table -->
-        <div class="card border-0 shadow-sm rounded-4 mb-4">
-            <div class="card-header bg-white border-0 pt-4 pb-0 px-4 d-flex justify-content-between">
-                <h5 class="fw-bold mb-0">Recent Products</h5>
-                <a href="products.php?q=<?php echo urlencode($seller['first_name']); ?>" class="btn btn-sm btn-outline-secondary rounded-pill">View All</a>
-            </div>
-            <div class="card-body p-0 mt-3">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="ps-4">Product Name</th>
-                                <th>Price</th>
-                                <th>Stock</th>
-                                <th>Status</th>
-                                <th class="pe-4 text-end">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if ($products && $products->num_rows > 0): ?>
-                                <?php while ($p = $products->fetch_assoc()): ?>
-                                    <tr>
-                                        <td class="ps-4 fw-bold"><?php echo htmlspecialchars($p['title_en']); ?></td>
-                                        <td class="fw-bold"><?php echo $site_settings['currency'] . number_format($p['price'], 2); ?></td>
-                                        <td><?php echo $p['stock_quantity']; ?></td>
-                                        <td>
-                                            <?php
-                                            $badge_class = 'bg-secondary';
-                                            if ($p['status'] === 'active') $badge_class = 'bg-success';
-                                            if ($p['status'] === 'pending') $badge_class = 'bg-warning text-dark';
-                                            ?>
-                                            <span class="badge <?php echo $badge_class; ?> rounded-pill">
-                                                <?php echo ucfirst($p['status']); ?>
-                                            </span>
-                                        </td>
-                                        <td class="pe-4 text-end">
-                                            <a href="product_details.php?id=<?php echo $p['id']; ?>" class="btn btn-sm btn-outline-primary rounded-pill">View</a>
-                                        </td>
-                                    </tr>
-                                <?php endwhile; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="5" class="text-center py-4 text-muted">No products listed by this seller.</td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Recent Orders Table -->
-        <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-header bg-white border-0 pt-4 pb-0 px-4 d-flex justify-content-between">
-                <h5 class="fw-bold mb-0">Recent Orders (Seller View)</h5>
-            </div>
-            <div class="card-body p-0 mt-3">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="ps-4">Order #</th>
-                                <th>Date</th>
-                                <th>Payment Status</th>
-                                <th>Order Status</th>
-                                <th class="pe-4 text-end">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if ($orders && $orders->num_rows > 0): ?>
-                                <?php while ($o = $orders->fetch_assoc()): ?>
-                                    <tr>
-                                        <td class="ps-4 fw-bold text-primary">#<?php echo htmlspecialchars($o['order_number']); ?></td>
-                                        <td><small class="text-muted"><?php echo date('d M Y', strtotime($o['created_at'])); ?></small></td>
-                                        <td>
-                                            <span class="badge bg-light text-dark border">
-                                                <?php echo ucfirst(str_replace('_', ' ', $o['payment_status'])); ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <?php
-                                            $badge_class = 'bg-secondary';
-                                            if ($o['order_status'] === 'completed' || $o['order_status'] === 'delivered') $badge_class = 'bg-success';
-                                            if ($o['order_status'] === 'cancelled') $badge_class = 'bg-danger';
-                                            if ($o['order_status'] === 'pending') $badge_class = 'bg-warning text-dark';
-                                            ?>
-                                            <span class="badge <?php echo $badge_class; ?> rounded-pill">
-                                                <?php echo ucfirst(str_replace('_', ' ', $o['order_status'])); ?>
-                                            </span>
-                                        </td>
-                                        <td class="pe-4 text-end">
-                                            <a href="order_details.php?id=<?php echo $o['id']; ?>" class="btn btn-sm btn-outline-primary rounded-pill">View</a>
-                                        </td>
-                                    </tr>
-                                <?php endwhile; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="5" class="text-center py-4 text-muted">No orders found for this seller's products.</td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
 <?php include __DIR__ . '/partials/footer.php'; ?>

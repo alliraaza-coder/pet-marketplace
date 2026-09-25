@@ -36,13 +36,16 @@ $o_res = $conn->query("
     FROM orders
 ")->fetch_assoc();
 
-// Financial counts
+// Financial counts Phase 8
 $f_res = $conn->query("
     SELECT 
-        COALESCE(SUM(CASE WHEN payment_status = 'released' THEN grand_total ELSE 0 END), 0) AS total_revenue,
-        COALESCE(SUM(CASE WHEN payment_status = 'held' THEN grand_total ELSE 0 END), 0) AS escrow_balance,
-        COALESCE(SUM(CASE WHEN payment_status = 'released' THEN grand_total ELSE 0 END), 0) AS released_payments,
-        COALESCE(SUM(CASE WHEN payment_status = 'refunded' THEN grand_total ELSE 0 END), 0) AS refunded_payments
+        COALESCE(SUM(CASE WHEN payment_status NOT IN ('pending','payment_submitted','rejected') THEN grand_total ELSE 0 END), 0) AS total_payments_received,
+        COALESCE(SUM(CASE WHEN payment_status IN ('seller_payment_sent', 'seller_payment_received') THEN seller_payment_amount ELSE 0 END), 0) AS total_paid_to_sellers,
+        COALESCE(SUM(CASE WHEN payment_status IN ('refund_sent', 'refund_received') THEN buyer_refund_amount ELSE 0 END), 0) AS total_refunds_sent,
+        COALESCE(SUM(CASE WHEN payment_status = 'payment_submitted' THEN grand_total ELSE 0 END), 0) AS pending_buyer_payments,
+        COALESCE(SUM(CASE WHEN payment_status = 'held' AND seller_delivered=1 AND buyer_received=1 AND admin_verified=1 AND seller_payment_sent_at IS NULL THEN grand_total ELSE 0 END), 0) AS pending_seller_payments,
+        COALESCE(SUM(CASE WHEN payment_status IN ('held','refund_submitted') AND order_status='cancelled' AND buyer_refund_sent_at IS NULL THEN grand_total ELSE 0 END), 0) AS pending_refunds,
+        COALESCE(SUM(CASE WHEN payment_status = 'held' THEN grand_total ELSE 0 END), 0) AS escrow_balance
     FROM orders
 ")->fetch_assoc();
 

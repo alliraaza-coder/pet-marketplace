@@ -104,19 +104,45 @@ include __DIR__ . '/partials/header.php';
 
     <!-- Metrics & Order History -->
     <div class="col-lg-8">
-        <!-- Metrics Row -->
-        <div class="row g-4 mb-4">
-            <div class="col-sm-6">
-                <div class="card border-0 shadow-sm bg-primary text-white p-4 h-100 rounded-4">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-white-50 mb-1">Total Orders Placed</h6>
-                            <h2 class="fw-bold mb-0"><?php echo number_format($metrics['total_orders']); ?></h2>
-                        </div>
-                        <i class="bi bi-cart fs-1 text-white-50"></i>
-                    </div>
+                <!-- Metrics Row -->
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-md-4">
+                <div class="card border-0 shadow-sm bg-primary text-white p-3 h-100 rounded-4 text-center">
+                    <h6 class="text-white-50 mb-1">Pets Bought</h6>
+                    <h4 class="fw-bold mb-0"><?php echo number_format($metrics['pets_bought']); ?></h4>
                 </div>
             </div>
+            <div class="col-sm-6 col-md-4">
+                <div class="card border-0 shadow-sm bg-success text-white p-3 h-100 rounded-4 text-center">
+                    <h6 class="text-white-50 mb-1">Total Amount Spent</h6>
+                    <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['total_spent'], 0); ?></h4>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <div class="card border-0 shadow-sm bg-info text-white p-3 h-100 rounded-4 text-center">
+                    <h6 class="text-white-50 mb-1">Completed Orders</h6>
+                    <h4 class="fw-bold mb-0"><?php echo number_format($metrics['completed_orders']); ?></h4>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <div class="card border-0 shadow-sm bg-secondary text-white p-3 h-100 rounded-4 text-center">
+                    <h6 class="text-white-50 mb-1">Cancelled Orders</h6>
+                    <h4 class="fw-bold mb-0"><?php echo number_format($metrics['cancelled_orders']); ?></h4>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <div class="card border-0 shadow-sm bg-danger text-white p-3 h-100 rounded-4 text-center">
+                    <h6 class="text-white-50 mb-1">Refunded Amount</h6>
+                    <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['refunded_amount'], 0); ?></h4>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <div class="card border-0 shadow-sm bg-warning text-dark p-3 h-100 rounded-4 text-center">
+                    <h6 class="text-dark-50 mb-1">Pending Amount</h6>
+                    <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['pending_amount'], 0); ?></h4>
+                </div>
+            </div>
+        </div>
             <div class="col-sm-6">
                 <div class="card border-0 shadow-sm bg-success text-white p-4 h-100 rounded-4">
                     <div class="d-flex justify-content-between align-items-center">

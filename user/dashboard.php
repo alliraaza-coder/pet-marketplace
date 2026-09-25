@@ -8,11 +8,18 @@ require_role('user');
 $user = current_user($conn);
 $user_id = $user['id'];
 
-// 1. Fetch Total Orders
-$stmt_to = $conn->prepare("SELECT COUNT(id) as total_orders FROM orders WHERE user_id = ?");
-$stmt_to->bind_param("i", $user_id);
-$stmt_to->execute();
-$total_orders = $stmt_to->get_result()->fetch_assoc()['total_orders'];
+// 1. Fetch Total Pets Bought and Amount Spent (Phase 8 logic)
+$stmt_metrics = $conn->prepare("
+    SELECT 
+        COALESCE(SUM(oi.quantity), 0) AS total_pets_bought,
+        COALESCE((SELECT SUM(grand_total) FROM orders WHERE user_id = ? AND order_status = 'completed'), 0) AS total_amount_spent
+    FROM orders o
+    JOIN order_items oi ON o.id = oi.order_id
+    WHERE o.user_id = ? AND o.order_status = 'completed'
+");
+$stmt_metrics->bind_param("ii", $user_id, $user_id);
+$stmt_metrics->execute();
+$metrics = $stmt_metrics->get_result()->fetch_assoc();
 
 // 2. Fetch Wishlist Items
 $stmt_wl = $conn->prepare("SELECT COUNT(id) as total_wishlist FROM wishlists WHERE user_id = ?");
@@ -77,38 +84,41 @@ include '../includes/header.php';
             
             <h2 class="fw-bold mb-4">Dashboard</h2>
             
-            <!-- Stats -->
+                        <!-- Stats -->
             <div class="row g-4 mb-4">
-                <div class="col-md-4">
-                    <div class="card border-0 shadow-sm rounded-4 bg-primary text-white h-100">
-                        <div class="card-body p-4 d-flex align-items-center justify-content-between">
-                            <div>
-                                <h6 class="text-white-50">Total Orders</h6>
-                                <h2 class="fw-bold mb-0"><?php echo $total_orders; ?></h2>
-                            </div>
-                            <div class="fs-1 opacity-50"><i class="bi bi-cart-check"></i></div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="card border-0 shadow-sm bg-primary text-white h-100 rounded-4">
+                        <div class="card-body p-4 text-center">
+                            <i class="bi bi-box-seam fs-1 mb-2"></i>
+                            <h3 class="fw-bold mb-0"><?php echo number_format($metrics['total_pets_bought']); ?></h3>
+                            <p class="mb-0 text-white-50 small">Total Pets Bought</p>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4">
-                    <div class="card border-0 shadow-sm rounded-4 bg-success text-white h-100">
-                        <div class="card-body p-4 d-flex align-items-center justify-content-between">
-                            <div>
-                                <h6 class="text-white-50">Wishlist Items</h6>
-                                <h2 class="fw-bold mb-0"><?php echo $total_wishlist; ?></h2>
-                            </div>
-                            <div class="fs-1 opacity-50"><i class="bi bi-heart"></i></div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="card border-0 shadow-sm bg-success text-white h-100 rounded-4">
+                        <div class="card-body p-4 text-center">
+                            <i class="bi bi-wallet2 fs-1 mb-2"></i>
+                            <h3 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['total_amount_spent'], 0); ?></h3>
+                            <p class="mb-0 text-white-50 small">Total Amount Spent</p>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4">
-                    <div class="card border-0 shadow-sm rounded-4 bg-warning text-dark h-100">
-                        <div class="card-body p-4 d-flex align-items-center justify-content-between">
-                            <div>
-                                <h6 class="text-dark-50">Pending Reviews</h6>
-                                <h2 class="fw-bold mb-0"><?php echo $pending_reviews; ?></h2>
-                            </div>
-                            <div class="fs-1 opacity-50"><i class="bi bi-star"></i></div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="card border-0 shadow-sm bg-danger text-white h-100 rounded-4">
+                        <div class="card-body p-4 text-center">
+                            <i class="bi bi-heart fs-1 mb-2"></i>
+                            <h3 class="fw-bold mb-0"><?php echo number_format($total_wishlist); ?></h3>
+                            <p class="mb-0 text-white-50 small">Wishlist Items</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="card border-0 shadow-sm bg-warning text-dark h-100 rounded-4">
+                        <div class="card-body p-4 text-center">
+                            <i class="bi bi-star-half fs-1 mb-2"></i>
+                            <h3 class="fw-bold mb-0"><?php echo number_format($pending_reviews); ?></h3>
+                            <p class="mb-0 text-dark-50 small">Pending Reviews</p>
                         </div>
                     </div>
                 </div>
