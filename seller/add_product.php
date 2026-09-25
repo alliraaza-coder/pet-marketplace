@@ -153,7 +153,7 @@ include '../includes/header.php';
     <div class="row g-4">
 
         <!-- Sidebar -->
-        <div class="col-lg-2 d-none d-lg-block">
+        <div class="col-lg-2 mb-4 mb-lg-0">
             <?php include 'partials/sidebar.php'; ?>
         </div>
 

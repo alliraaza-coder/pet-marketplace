@@ -1,6 +1,6 @@
-﻿<?php
+<?php
 /**
- * Seller Dashboard â€” Phase 3.1
+ * Seller Dashboard — Phase 3.1
  * Shows real-time stats: products, orders, earnings
  */
 require_once '../includes/config.php';
@@ -11,7 +11,7 @@ require_role('seller');
 $user     = current_user($conn);
 $seller_id = (int)$_SESSION['user_id'];
 
-// â”€â”€ Product Counts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Product Counts ──────────────────────────────────────────
 $prod_stmt = $conn->prepare(
     "SELECT
         COUNT(*) AS total,
@@ -25,7 +25,7 @@ $prod_stmt->bind_param('i', $seller_id);
 $prod_stmt->execute();
 $prod_counts = $prod_stmt->get_result()->fetch_assoc();
 
-// â”€â”€ Order Counts & Earnings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Order Counts & Earnings ──────────────────────────────────
 $order_stmt = $conn->prepare(
     "SELECT
         SUM(CASE WHEN o.order_status = 'completed' THEN 1 ELSE 0 END) AS completed_orders,
@@ -41,7 +41,7 @@ $order_stmt->execute();
 $order_stats = $order_stmt->get_result()->fetch_assoc();
 
 
-// â”€â”€ Recent Orders (last 5) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Recent Orders (last 5) ───────────────────────────────────
 $recent_stmt = $conn->prepare(
     "SELECT o.id, o.order_number, o.order_status, o.created_at,
             u.first_name, u.last_name,
@@ -58,7 +58,7 @@ $recent_stmt->bind_param('i', $seller_id);
 $recent_stmt->execute();
 $recent_orders = $recent_stmt->get_result();
 
-// â”€â”€ Last 5 Products â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Last 5 Products ──────────────────────────────────────────
 $recent_prod_stmt = $conn->prepare(
     "SELECT p.id, p.title_en, p.price, p.status, p.created_at,
             c.name_en AS cat_name,
@@ -100,12 +100,12 @@ function status_badge($status) {
 <div class="container-fluid py-4 px-4">
     <div class="row g-4">
 
-        <!-- â•â•â• Sidebar â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-        <div class="col-lg-2 d-none d-lg-block">
+        <!-- ═══ Sidebar ═══════════════════════════════════════ -->
+        <div class="col-lg-2 mb-4 mb-lg-0">
             <?php include 'partials/sidebar.php'; ?>
         </div>
 
-        <!-- â•â•â• Main Content â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+        <!-- ═══ Main Content ════════════════════════════════════ -->
         <div class="col-lg-10">
             <?php display_messages(); ?>
 
@@ -125,7 +125,7 @@ function status_badge($status) {
                 </a>
             </div>
 
-            <!-- â”€â”€ Stat Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+            <!-- ── Stat Cards ─────────────────────────────────── -->
             <div class="row g-3 mb-4">
                 <!-- Total Products -->
                 <div class="col-6 col-md-4 col-xl-2">
@@ -233,7 +233,7 @@ function status_badge($status) {
                 </div>
             </div>
 
-            <!-- â”€â”€ Bottom Row: Recent Orders + Recent Products â”€â”€â”€ -->
+            <!-- ── Bottom Row: Recent Orders + Recent Products ─── -->
             <div class="row g-4">
 
                 <!-- Recent Orders -->

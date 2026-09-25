@@ -290,3 +290,4 @@ $products = $stmt->get_result();
 <?php include __DIR__ . '/partials/footer.php'; ?>
 
 
+

@@ -133,7 +133,7 @@ include 'includes/header.php';
                     <div class="product-info">
                         <span class="product-category"><?php echo htmlspecialchars($fp['category_name'] ?? 'Uncategorized'); ?></span>
                         <a href="product_details.php?id=<?php echo $fp['id']; ?>" class="text-decoration-none">
-                            <h3 class="product-title"><?php echo htmlspecialchars($fp['title_en']); ?></h3>
+                            <h3 class="product-title text-truncate-2"><?php echo htmlspecialchars($fp['title_en']); ?></h3>
                         </a>
                         <div class="product-price"><?php echo $site_settings['currency'] . number_format($fp['price'], 2); ?></div>
                         <div class="product-meta mt-3">
@@ -181,3 +181,4 @@ include 'includes/header.php';
 </section>
 
 <?php include 'includes/footer.php'; ?>
+

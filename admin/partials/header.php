@@ -27,7 +27,8 @@ if (!empty($user['force_password_change']) && basename($_SERVER['PHP_SELF']) !==
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f4f6f9; }
-        .sidebar { min-height: 100vh; background-color: #343a40; }
+        .sidebar { background-color: #343a40; }
+        @media (min-width: 992px) { .sidebar { min-height: 100vh; position: sticky; top: 0; } }
         .sidebar a { color: #c2c7d0; text-decoration: none; padding: 12px 20px; display: block; border-bottom: 1px solid #4b545c; font-size: 0.95rem; }
         .sidebar a:hover, .sidebar a.active { background-color: #007bff; color: #fff; }
         .card { border-radius: 12px; }

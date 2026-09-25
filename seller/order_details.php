@@ -183,7 +183,7 @@ include '../includes/header.php';
                                     <?php elseif ($order['order_status'] === 'ready_for_shipment'): ?>
                                         <button type="submit" name="workflow_action" value="ship" class="btn btn-warning fw-bold">Mark Out For Delivery</button>
                                     <?php elseif ($order['order_status'] === 'out_for_delivery'): ?>
-                                        <button type="submit" name="workflow_action" value="deliver" class="btn btn-success fw-bold">Mark Bird Delivered</button>
+                                        <button type="submit" name="workflow_action" value="deliver" class="btn btn-success fw-bold" onclick="return confirm('Confirm you have delivered the bird?');">Mark Bird Delivered</button>
                                     <?php elseif ($order['order_status'] === 'delivered'): ?>
                                         <div class="alert alert-success py-2 mb-0 text-center"><i class="bi bi-check-circle me-1"></i> You marked this delivered. Waiting for buyer confirmation.</div>
                                     <?php elseif ($order['order_status'] === 'completed'): ?>
@@ -259,3 +259,4 @@ include '../includes/header.php';
 </div>
 
 <?php include '../includes/footer.php'; ?>
+

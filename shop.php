@@ -215,7 +215,7 @@ include 'includes/header.php';
                             </div>
                             <div class="product-info">
                                 <span class="product-category"><?php echo htmlspecialchars($p['category_name'] ?? 'Uncategorized'); ?></span>
-                                <a href="product_details.php?id=<?php echo $p['id']; ?>" class="text-decoration-none"><h3 class="product-title"><?php echo htmlspecialchars($p['title_en']); ?></h3></a>
+                                <a href="product_details.php?id=<?php echo $p['id']; ?>" class="text-decoration-none"><h3 class="product-title text-truncate-2"><?php echo htmlspecialchars($p['title_en']); ?></h3></a>
                                 <div class="product-price"><?php echo $site_settings['currency']; ?><?php echo number_format($p['price'], 2); ?></div>
                                 <div class="product-meta mt-3">
                                     <span class="product-location"><i class="bi bi-geo-alt me-1"></i><?php echo htmlspecialchars($p['seller_city'] ?? 'Location N/A'); ?></span>
@@ -268,3 +268,4 @@ include 'includes/header.php';
 </div>
 
 <?php include 'includes/footer.php'; ?>
+

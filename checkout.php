@@ -260,31 +260,23 @@ include 'includes/header.php';
                             <!-- JazzCash Details -->
                             <div id="details_jazzcash" class="payment-detail-block d-none">
                                 <h6 class="fw-bold text-danger mb-2">JazzCash Mobile Wallet Details</h6>
-                                <div class="row g-2">
-                                    <div class="col-md-6">
-                                        <label for="jazzcash_phone" class="form-label small mb-1 fw-medium">JazzCash Mobile Number <span class="text-danger">*</span></label>
-                                        <input type="tel" class="form-control form-control-sm rounded-3" id="jazzcash_phone" name="jazzcash_phone" placeholder="e.g. 03001234567">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="jazzcash_mpin" class="form-label small mb-1 fw-medium">Simulated MPIN Wallet Pin (Demo)</label>
-                                        <input type="password" class="form-control form-control-sm rounded-3" id="jazzcash_mpin" name="jazzcash_mpin" placeholder="Enter 4 digit PIN (demo)" maxlength="4">
-                                    </div>
-                                </div>
+                                <p class="small text-muted mb-0">
+                                    Please send the total amount to the following JazzCash account:<br>
+                                    <strong>Account Title:</strong> Pet Marketplace<br>
+                                    <strong>Mobile Number:</strong> 0300-1234567<br>
+                                    <em>Note: After placing the order, you will need to upload a screenshot of the payment receipt on your order details page.</em>
+                                </p>
                             </div>
 
                             <!-- EasyPaisa Details -->
                             <div id="details_easypaisa" class="payment-detail-block d-none">
                                 <h6 class="fw-bold text-primary mb-2">EasyPaisa Mobile Wallet Details</h6>
-                                <div class="row g-2">
-                                    <div class="col-md-6">
-                                        <label for="easypaisa_phone" class="form-label small mb-1 fw-medium">EasyPaisa Mobile Number <span class="text-danger">*</span></label>
-                                        <input type="tel" class="form-control form-control-sm rounded-3" id="easypaisa_phone" name="easypaisa_phone" placeholder="e.g. 03451234567">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="easypaisa_pin" class="form-label small mb-1 fw-medium">Simulated Account PIN (Demo)</label>
-                                        <input type="password" class="form-control form-control-sm rounded-3" id="easypaisa_pin" name="easypaisa_pin" placeholder="Enter 5 digit PIN (demo)" maxlength="5">
-                                    </div>
-                                </div>
+                                <p class="small text-muted mb-0">
+                                    Please send the total amount to the following EasyPaisa account:<br>
+                                    <strong>Account Title:</strong> Pet Marketplace<br>
+                                    <strong>Mobile Number:</strong> 0345-1234567<br>
+                                    <em>Note: After placing the order, you will need to upload a screenshot of the payment receipt on your order details page.</em>
+                                </p>
                             </div>
 
 
