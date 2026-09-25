@@ -1,0 +1,28 @@
+# Dependencies and environments
+/vendor/
+/node_modules/
+.env
+
+# Uploaded Files (Do not track user-uploaded data)
+/assets/uploads/products/*
+!/assets/uploads/products/index.php
+!/assets/uploads/products/.htaccess
+
+/assets/images/payments/*
+!/assets/images/payments/index.php
+!/assets/images/payments/.htaccess
+
+/assets/images/profiles/*
+!/assets/images/profiles/index.php
+!/assets/images/profiles/default-user.png
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
+
+# Backups
+*.sql
+*.bak

@@ -198,7 +198,7 @@ include 'includes/header.php';
                     <div class="col-md-6 col-lg-4">
                         <div class="product-card h-100">
                             <div class="product-img-wrapper">
-                                <img src="<?php echo get_product_image_url($conn, $p['id']); ?>" alt="<?php echo htmlspecialchars($p['title_en']); ?>">
+                                <img src="<?php echo get_product_image_url($conn, $p['id']); ?>" loading="lazy" alt="<?php echo htmlspecialchars($p['title_en']); ?>">
                                 <?php if($p['is_featured']): ?>
                                 <div class="product-badges">
                                     <span class="badge-featured">Featured</span>
@@ -268,4 +268,5 @@ include 'includes/header.php';
 </div>
 
 <?php include 'includes/footer.php'; ?>
+
 

@@ -9,30 +9,55 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Database Credentials (XAMPP Default)
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'pet_marketplace');
+// Load environment variables from .env file
+$env_file = __DIR__ . '/../.env';
+$env = [];
+if (file_exists($env_file)) {
+    $env = parse_ini_file($env_file);
+}
+
+// Environment Config
+define('APP_ENV', $env['APP_ENV'] ?? 'production');
+define('APP_DEBUG', filter_var($env['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN));
 
 // Error Reporting
-mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+if (APP_DEBUG) {
+    ini_set('display_errors', 1);
+    ini_set('display_startup_errors', 1);
+    error_reporting(E_ALL);
+    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+} else {
+    ini_set('display_errors', 0);
+    ini_set('display_startup_errors', 0);
+    error_reporting(E_ALL); // Log all errors
+    mysqli_report(MYSQLI_REPORT_OFF); // Disable mysqli exceptions revealing credentials
+}
+
+// Database Credentials
+define('DB_HOST', $env['DB_HOST'] ?? 'localhost');
+define('DB_USER', $env['DB_USER'] ?? 'root');
+define('DB_PASS', $env['DB_PASS'] ?? '');
+define('DB_NAME', $env['DB_NAME'] ?? 'pet_marketplace');
 
 try {
     // Create connection
     $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
     
-    // Set charset to utf8mb4 for full unicode support (including emojis and Urdu text)
+    // Set charset to utf8mb4 for full unicode support
     $conn->set_charset("utf8mb4");
-} catch (mysqli_sql_exception $e) {
+} catch (Exception $e) {
     // Log the error to a file in production, don't display it directly to users
-    error_log($e->getMessage());
-    die("Database connection failed. Please try again later.");
+    error_log("Database connection error: " . $e->getMessage());
+    if (APP_DEBUG) {
+        die("Database connection failed: " . $e->getMessage());
+    } else {
+        http_response_code(500);
+        die("Database connection failed. Please try again later.");
+    }
 }
 
 // Base URL Configuration
-// Assuming the project is in htdocs/pet_marketplace
-define('BASE_URL', 'http://localhost/pet_marketplace');
+define('BASE_URL', rtrim($env['APP_URL'] ?? 'http://localhost/pet_marketplace', '/'));
 
 // Global Settings Configuration
 $site_settings = [
