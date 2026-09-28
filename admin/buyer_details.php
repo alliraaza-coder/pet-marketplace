@@ -29,17 +29,23 @@ if (!$buyer) {
     exit;
 }
 
-// Fetch Buyer Metrics
+// Fetch Buyer Metrics Phase 8 Accurate
 $metrics_stmt = $conn->prepare("
     SELECT 
-        COUNT(*) AS total_orders,
-        COALESCE(SUM(CASE WHEN payment_status = 'released' THEN grand_total ELSE 0 END), 0) AS total_spent
+        COUNT(*) AS total_buy_requests,
+        SUM(payment_status NOT IN ('pending','payment_submitted','rejected')) AS total_orders,
+        SUM(order_status = 'completed') AS completed_orders,
+        SUM(order_status = 'cancelled') AS cancelled_orders,
+        (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.user_id = ? AND o.payment_status NOT IN ('pending','payment_submitted','rejected')) AS pets_purchased,
+        COALESCE(SUM(CASE WHEN payment_status NOT IN ('pending','payment_submitted','rejected','refund_sent','refund_received') THEN grand_total ELSE 0 END), 0) AS total_purchase_value,
+        COALESCE(SUM(CASE WHEN payment_status NOT IN ('pending','payment_submitted','rejected') THEN grand_total ELSE 0 END), 0) AS total_amount_paid,
+        COALESCE(SUM(CASE WHEN payment_status IN ('refund_sent','refund_received') THEN buyer_refund_amount ELSE 0 END), 0) AS total_refunds,
+        COALESCE(SUM(CASE WHEN payment_status = 'payment_submitted' THEN grand_total ELSE 0 END), 0) AS pending_payments
     FROM orders WHERE user_id = ?
 ");
-$metrics_stmt->bind_param("i", $buyer_id);
+$metrics_stmt->bind_param("ii", $buyer_id, $buyer_id);
 $metrics_stmt->execute();
 $metrics = $metrics_stmt->get_result()->fetch_assoc();
-
 // Fetch Buyer Orders
 $orders_stmt = $conn->prepare("
     SELECT id, order_number, grand_total, payment_method, payment_status, order_status, created_at 

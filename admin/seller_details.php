@@ -29,18 +29,22 @@ if (!$seller) {
     exit;
 }
 
-// Fetch Seller Metrics
+// Fetch Seller Metrics (Phase 8 Accurate)
 $metrics_stmt = $conn->prepare("
     SELECT 
         (SELECT COUNT(*) FROM products WHERE seller_id = ? AND is_deleted = 0) AS total_products,
-        (SELECT COUNT(*) FROM orders o JOIN order_items oi ON o.id = oi.order_id WHERE oi.seller_id = ?) AS total_orders,
-        (SELECT COALESCE(SUM(grand_total), 0) FROM orders o JOIN order_items oi ON o.id = oi.order_id WHERE oi.seller_id = ? AND o.payment_status = 'released') AS released_earnings,
-        (SELECT COALESCE(SUM(grand_total), 0) FROM orders o JOIN order_items oi ON o.id = oi.order_id WHERE oi.seller_id = ? AND o.payment_status = 'held') AS pending_earnings
+        (SELECT COALESCE(SUM(quantity), 0) FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE oi.seller_id = ? AND o.payment_status NOT IN ('pending','payment_submitted','rejected')) AS products_sold,
+        (SELECT COUNT(DISTINCT o.id) FROM orders o JOIN order_items oi ON o.id = oi.order_id WHERE oi.seller_id = ?) AS total_orders,
+        (SELECT COUNT(DISTINCT o.id) FROM orders o JOIN order_items oi ON o.id = oi.order_id WHERE oi.seller_id = ? AND o.order_status = 'completed') AS completed_orders,
+        (SELECT COUNT(DISTINCT o.id) FROM orders o JOIN order_items oi ON o.id = oi.order_id WHERE oi.seller_id = ? AND o.order_status = 'cancelled') AS cancelled_orders,
+        (SELECT COALESCE(SUM(o.grand_total), 0) FROM orders o JOIN order_items oi ON o.id = oi.order_id WHERE oi.seller_id = ? AND o.payment_status NOT IN ('pending','payment_submitted','rejected','refund_sent','refund_received')) AS total_sales_value,
+        (SELECT COALESCE(SUM(o.seller_payment_amount), 0) FROM orders o JOIN order_items oi ON o.id = oi.order_id WHERE oi.seller_id = ? AND o.payment_status IN ('seller_payment_sent', 'seller_payment_received')) AS amount_paid,
+        (SELECT COALESCE(SUM(o.grand_total), 0) FROM orders o JOIN order_items oi ON o.id = oi.order_id WHERE oi.seller_id = ? AND o.payment_status = 'held' AND o.seller_delivered=1 AND o.buyer_received=1 AND o.admin_verified=1 AND o.seller_payment_sent_at IS NULL) AS amount_pending,
+        (SELECT COALESCE(SUM(o.buyer_refund_amount), 0) FROM orders o JOIN order_items oi ON o.id = oi.order_id WHERE oi.seller_id = ? AND o.payment_status IN ('refund_sent', 'refund_received')) AS amount_refunded
 ");
-$metrics_stmt->bind_param("iiii", $seller_id, $seller_id, $seller_id, $seller_id);
+$metrics_stmt->bind_param("iiiiiiiii", $seller_id, $seller_id, $seller_id, $seller_id, $seller_id, $seller_id, $seller_id, $seller_id, $seller_id);
 $metrics_stmt->execute();
 $metrics = $metrics_stmt->get_result()->fetch_assoc();
-
 // Fetch Seller Products (Limit 10 for preview)
 $products_stmt = $conn->prepare("
     SELECT id, title_en, price, stock_quantity, status, created_at 
@@ -137,7 +141,7 @@ include __DIR__ . '/partials/header.php';
 
     <!-- Metrics & Listings -->
     <div class="col-lg-8">
-                <!-- Metrics Row -->
+                <!-- Metrics Row Phase 8 Accurate -->
         <div class="row g-3 mb-4">
             <div class="col-sm-6 col-md-3">
                 <div class="card border-0 shadow-sm bg-primary text-white p-3 h-100 rounded-4 text-center">
@@ -148,40 +152,46 @@ include __DIR__ . '/partials/header.php';
             <div class="col-sm-6 col-md-3">
                 <div class="card border-0 shadow-sm bg-success text-white p-3 h-100 rounded-4 text-center">
                     <h6 class="text-white-50 mb-1">Total Sales</h6>
-                    <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['total_sales'], 0); ?></h4>
+                    <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['total_sales_value'], 0); ?></h4>
                 </div>
             </div>
             <div class="col-sm-6 col-md-3">
                 <div class="card border-0 shadow-sm bg-info text-white p-3 h-100 rounded-4 text-center">
                     <h6 class="text-white-50 mb-1">Payments Sent</h6>
-                    <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['payments_sent'], 0); ?></h4>
+                    <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['amount_paid'], 0); ?></h4>
                 </div>
             </div>
             <div class="col-sm-6 col-md-3">
                 <div class="card border-0 shadow-sm bg-warning text-dark p-3 h-100 rounded-4 text-center">
                     <h6 class="text-dark-50 mb-1">Payments Pending</h6>
-                    <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['payments_pending'], 0); ?></h4>
+                    <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['amount_pending'], 0); ?></h4>
                 </div>
             </div>
-            <div class="col-sm-6 col-md-4">
+            <div class="col-sm-6 col-md-3">
+                <div class="card border-0 shadow-sm bg-white border p-3 h-100 rounded-4 text-center">
+                    <h6 class="text-muted mb-1">Total Orders</h6>
+                    <h4 class="fw-bold mb-0"><?php echo number_format($metrics['total_orders']); ?></h4>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
                 <div class="card border-0 shadow-sm bg-white border p-3 h-100 rounded-4 text-center">
                     <h6 class="text-muted mb-1">Completed Orders</h6>
                     <h4 class="fw-bold mb-0"><?php echo number_format($metrics['completed_orders']); ?></h4>
                 </div>
             </div>
-            <div class="col-sm-6 col-md-4">
+            <div class="col-sm-6 col-md-3">
                 <div class="card border-0 shadow-sm bg-white border p-3 h-100 rounded-4 text-center">
                     <h6 class="text-muted mb-1">Cancelled Orders</h6>
                     <h4 class="fw-bold mb-0"><?php echo number_format($metrics['cancelled_orders']); ?></h4>
                 </div>
             </div>
-            <div class="col-sm-6 col-md-4">
-                <div class="card border-0 shadow-sm bg-white border p-3 h-100 rounded-4 text-center">
-                    <h6 class="text-muted mb-1">Refunded Orders</h6>
-                    <h4 class="fw-bold mb-0"><?php echo number_format($metrics['refunded_orders']); ?></h4>
+            <div class="col-sm-6 col-md-3">
+                <div class="card border-0 shadow-sm bg-danger text-white border p-3 h-100 rounded-4 text-center">
+                    <h6 class="text-white-50 mb-1">Refund Amount</h6>
+                    <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['amount_refunded'], 0); ?></h4>
                 </div>
             </div>
         </div>
+    </div>
 </div>
-
 <?php include __DIR__ . '/partials/footer.php'; ?>

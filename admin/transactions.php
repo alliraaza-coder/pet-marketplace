@@ -122,9 +122,10 @@ include __DIR__ . '/partials/header.php';
                         <th class="ps-4">Txn ID</th>
                         <th>Date</th>
                         <th>Order #</th>
-                        <th>Type</th>
+                        <th>Type / Method</th>
                         <th>Amount</th>
                         <th>Status</th>
+                        <th class="pe-4 text-end">Receipt</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -137,7 +138,7 @@ include __DIR__ . '/partials/header.php';
                                     <?php if ($tx['order_number']): ?>
                                         <a href="order_details.php?id=<?php echo $tx['order_id']; ?>" class="fw-bold text-primary">#<?php echo htmlspecialchars($tx['order_number']); ?></a>
                                     <?php else: ?>
-                                        <span class="text-muted">—</span>
+                                        <span class="text-muted">?"</span>
                                     <?php endif; ?>
                                 </td>
                                 <td>
@@ -147,14 +148,22 @@ include __DIR__ . '/partials/header.php';
                                     if ($tx['transaction_type'] === 'release') $t_icon = '<i class="bi bi-box-arrow-up-right text-primary me-1"></i>';
                                     if ($tx['transaction_type'] === 'refund') $t_icon = '<i class="bi bi-arrow-counterclockwise text-danger me-1"></i>';
                                     ?>
-                                    <?php echo $t_icon . ucfirst($tx['transaction_type']); ?>
+                                    <div><?php echo $t_icon . ucfirst($tx['transaction_type']); ?></div>
+                                    <small class="text-muted"><?php echo htmlspecialchars($tx['payment_method'] ?? 'N/A'); ?></small>
                                 </td>
                                 <td class="fw-bold"><?php echo $site_settings['currency'] . number_format($tx['amount'], 2); ?></td>
                                 <td>
-                                    <?php if ($tx['status'] === 'completed'): ?>
+                                    <?php if ($tx['status'] === 'completed' || $tx['status'] === 'seller_payment_received' || $tx['status'] === 'refund_received'): ?>
                                         <span class="badge bg-success rounded-pill px-3 py-1">Completed</span>
                                     <?php else: ?>
-                                        <span class="badge bg-warning text-dark rounded-pill px-3 py-1"><?php echo ucfirst($tx['status']); ?></span>
+                                        <span class="badge bg-warning text-dark rounded-pill px-3 py-1"><?php echo ucfirst(str_replace('_', ' ', $tx['status'])); ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="pe-4 text-end">
+                                    <?php if (!empty($tx['receipt'])): ?>
+                                        <a href="../assets/images/payments/<?php echo htmlspecialchars($tx['receipt']); ?>" target="_blank" class="btn btn-sm btn-outline-secondary rounded-circle" title="View Receipt"><i class="bi bi-image"></i></a>
+                                    <?php else: ?>
+                                        <span class="text-muted small">None</span>
                                     <?php endif; ?>
                                 </td>
                             </tr>

@@ -28,10 +28,12 @@ $prod_counts = $prod_stmt->get_result()->fetch_assoc();
 // ── Order Counts & Earnings ──────────────────────────────────
 $order_stmt = $conn->prepare(
     "SELECT
+        COUNT(DISTINCT o.id) AS total_orders,
         SUM(CASE WHEN o.order_status = 'completed' THEN 1 ELSE 0 END) AS completed_orders,
-        COALESCE(SUM(CASE WHEN o.payment_status = 'released' THEN oi.total ELSE 0 END), 0) AS total_earnings,
-        COALESCE(SUM(CASE WHEN o.payment_status = 'held' THEN oi.total ELSE 0 END), 0) AS pending_escrow_payments,
-        COALESCE(SUM(CASE WHEN o.payment_status = 'released' THEN oi.total ELSE 0 END), 0) AS released_payments
+        COALESCE(SUM(oi.quantity), 0) AS products_sold,
+        COALESCE(SUM(CASE WHEN o.payment_status NOT IN ('pending','payment_submitted','rejected','refund_sent','refund_received') THEN oi.total ELSE 0 END), 0) AS total_sales,
+        COALESCE(SUM(CASE WHEN o.payment_status IN ('seller_payment_sent','seller_payment_received') THEN o.seller_payment_amount ELSE 0 END), 0) AS payments_received,
+        COALESCE(SUM(CASE WHEN o.payment_status = 'held' AND o.seller_payment_sent_at IS NULL THEN oi.total ELSE 0 END), 0) AS pending_seller_payments
      FROM order_items oi
      JOIN orders o ON oi.order_id = o.id
      WHERE oi.seller_id = ? AND o.payment_status NOT IN ('pending', 'payment_submitted', 'rejected')"
@@ -163,15 +165,15 @@ function status_badge($status) {
                         </div>
                     </div>
                 </div>
-                <!-- Sold -->
+                <!-- Products Sold -->
                 <div class="col-6 col-md-4 col-xl-2">
                     <div class="card border-0 shadow-sm rounded-4 h-100 stat-card">
                         <div class="card-body p-3 text-center">
                             <div class="stat-icon bg-secondary bg-opacity-10 text-secondary rounded-circle mx-auto mb-2">
                                 <i class="bi bi-bag-check fs-4"></i>
                             </div>
-                            <h3 class="fw-bold mb-0 text-secondary"><?php echo (int)$prod_counts['sold']; ?></h3>
-                            <p class="text-muted small mb-0">Sold</p>
+                            <h3 class="fw-bold mb-0 text-secondary"><?php echo (int)$order_stats['products_sold']; ?></h3>
+                            <p class="text-muted small mb-0">Products Sold</p>
                         </div>
                     </div>
                 </div>
@@ -187,7 +189,7 @@ function status_badge($status) {
                         </div>
                     </div>
                 </div>
-                <!-- Total Earnings -->
+                <!-- Total Sales -->
                 <div class="col-6 col-md-4 col-xl-2">
                     <div class="card border-0 shadow-sm rounded-4 h-100 stat-card">
                         <div class="card-body p-3 text-center">
@@ -195,14 +197,14 @@ function status_badge($status) {
                                 <i class="bi bi-currency-dollar fs-4"></i>
                             </div>
                             <h3 class="fw-bold mb-0">
-                                <?php echo $site_settings['currency'] . number_format($order_stats['total_earnings'], 0); ?>
+                                <?php echo $site_settings['currency'] . number_format($order_stats['total_sales'], 0); ?>
                             </h3>
-                            <p class="text-muted small mb-0">Total Earnings</p>
+                            <p class="text-muted small mb-0">Total Sales</p>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Pending Escrow Payments -->
+                <!-- Pending Seller Payments -->
                 <div class="col-6 col-md-4 col-xl-2">
                     <div class="card border-0 shadow-sm rounded-4 h-100 bg-warning text-dark stat-card">
                         <div class="card-body p-3 text-center">
@@ -210,14 +212,14 @@ function status_badge($status) {
                                 <i class="bi bi-clock-history fs-4"></i>
                             </div>
                             <h3 class="fw-bold mb-0">
-                                <?php echo $site_settings['currency'] . number_format($order_stats['pending_escrow_payments'], 0); ?>
+                                <?php echo $site_settings['currency'] . number_format($order_stats['pending_seller_payments'], 0); ?>
                             </h3>
-                            <p class="text-dark-50 small mb-0">Pending Escrow Payments</p>
+                            <p class="text-dark-50 small mb-0">Pending Payments</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Released Payments -->
+                <!-- Payments Received -->
                 <div class="col-6 col-md-4 col-xl-2">
                     <div class="card border-0 shadow-sm rounded-4 h-100 bg-success text-white stat-card">
                         <div class="card-body p-3 text-center">
@@ -225,9 +227,9 @@ function status_badge($status) {
                                 <i class="bi bi-wallet2 fs-4"></i>
                             </div>
                             <h3 class="fw-bold mb-0">
-                                <?php echo $site_settings['currency'] . number_format($order_stats['released_payments'], 0); ?>
+                                <?php echo $site_settings['currency'] . number_format($order_stats['payments_received'], 0); ?>
                             </h3>
-                            <p class="text-white-50 small mb-0">Released Payments</p>
+                            <p class="text-white-50 small mb-0">Payments Received</p>
                         </div>
                     </div>
                 </div>

@@ -1,13 +1,42 @@
 <?php
 /**
  * Admin Site Settings
- * Phase 3.3
+ * Phase 3.3 + Phase 8: Payment Account Details
  */
 $page_title = "Global Settings";
 $page_heading = "System Settings";
 include __DIR__ . '/partials/header.php';
 
 $admin_id = $_SESSION['user_id'];
+
+// Handle Payment Account Settings Update
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_payment_accounts') {
+    $conn->begin_transaction();
+    try {
+        $pay_fields = [
+            'pay_jazzcash_name', 'pay_jazzcash_number',
+            'pay_easypaisa_name', 'pay_easypaisa_number',
+            'pay_bank_name', 'pay_bank_title', 'pay_bank_account', 'pay_bank_iban'
+        ];
+        $stmt = $conn->prepare("INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+        foreach ($pay_fields as $field) {
+            $val = sanitize_input($_POST[$field] ?? '');
+            $stmt->bind_param("ss", $field, $val);
+            $stmt->execute();
+        }
+        log_admin_activity($conn, $admin_id, "Updated Payment Accounts", "Updated admin payment account details.");
+        $conn->commit();
+        $site_settings = [];
+        $res = $conn->query("SELECT setting_key, setting_value FROM site_settings");
+        while ($row = $res->fetch_assoc()) $site_settings[$row['setting_key']] = $row['setting_value'];
+        $_SESSION['success'] = "Payment account details updated successfully.";
+    } catch (Exception $e) {
+        $conn->rollback();
+        $_SESSION['error'] = "Failed: " . $e->getMessage();
+    }
+    header('Location: settings.php#payment-accounts');
+    exit;
+}
 
 // Handle Settings Update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_settings') {
@@ -155,6 +184,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     <li class="mb-2 border-bottom border-light border-opacity-25 pb-2"><strong>Upload Max Size:</strong> <?php echo ini_get('upload_max_filesize'); ?></li>
                     <li class="mb-2 border-bottom border-light border-opacity-25 pb-2"><strong>Post Max Size:</strong> <?php echo ini_get('post_max_size'); ?></li>
                     <li><strong>Max Execution Time:</strong> <?php echo ini_get('max_execution_time'); ?>s</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Account Details -->
+<div class="row mt-4" id="payment-accounts">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-header bg-white border-0 pt-4 pb-0 px-4">
+                <h5 class="fw-bold mb-0"><i class="bi bi-credit-card-2-back me-2 text-success"></i>Admin Payment Receiving Accounts</h5>
+                <p class="text-muted small mb-0">These are the accounts buyers will send money to. Shown to buyers after they place a buy request.</p>
+            </div>
+            <div class="card-body p-4">
+                <form action="settings.php" method="POST">
+                    <input type="hidden" name="action" value="update_payment_accounts">
+                    
+                    <h6 class="fw-bold text-success mb-3"><i class="bi bi-phone me-2"></i>JazzCash</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Account Name</label>
+                            <input type="text" name="pay_jazzcash_name" class="form-control bg-light border-0" value="<?php echo htmlspecialchars($site_settings['pay_jazzcash_name'] ?? ''); ?>" placeholder="e.g. PetMarket Admin">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Mobile Number</label>
+                            <input type="text" name="pay_jazzcash_number" class="form-control bg-light border-0" value="<?php echo htmlspecialchars($site_settings['pay_jazzcash_number'] ?? ''); ?>" placeholder="e.g. 03001234567">
+                        </div>
+                    </div>
+                    
+                    <h6 class="fw-bold text-success mb-3"><i class="bi bi-phone me-2"></i>EasyPaisa</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Account Name</label>
+                            <input type="text" name="pay_easypaisa_name" class="form-control bg-light border-0" value="<?php echo htmlspecialchars($site_settings['pay_easypaisa_name'] ?? ''); ?>" placeholder="e.g. PetMarket Admin">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Mobile Number</label>
+                            <input type="text" name="pay_easypaisa_number" class="form-control bg-light border-0" value="<?php echo htmlspecialchars($site_settings['pay_easypaisa_number'] ?? ''); ?>" placeholder="e.g. 03111234567">
+                        </div>
+                    </div>
+                    
+                    <h6 class="fw-bold text-success mb-3"><i class="bi bi-bank me-2"></i>Bank Transfer</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Bank Name</label>
+                            <input type="text" name="pay_bank_name" class="form-control bg-light border-0" value="<?php echo htmlspecialchars($site_settings['pay_bank_name'] ?? ''); ?>" placeholder="e.g. Meezan Bank">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Account Title</label>
+                            <input type="text" name="pay_bank_title" class="form-control bg-light border-0" value="<?php echo htmlspecialchars($site_settings['pay_bank_title'] ?? ''); ?>" placeholder="e.g. PetMarket Pvt Ltd">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Account Number</label>
+                            <input type="text" name="pay_bank_account" class="form-control bg-light border-0" value="<?php echo htmlspecialchars($site_settings['pay_bank_account'] ?? ''); ?>" placeholder="e.g. 01230123456789">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">IBAN (optional)</label>
+                            <input type="text" name="pay_bank_iban" class="form-control bg-light border-0" value="<?php echo htmlspecialchars($site_settings['pay_bank_iban'] ?? ''); ?>" placeholder="e.g. PK36MEZN0001230123456789">
+                        </div>
+                    </div>
+                    
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-success rounded-pill px-5 fw-bold">Save Payment Accounts</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm rounded-4 bg-success text-white">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-3"><i class="bi bi-info-circle-fill me-2"></i>How It Works</h5>
+                <ul class="list-unstyled small mb-0">
+                    <li class="mb-2 pb-2 border-bottom border-white border-opacity-25"><i class="bi bi-1-circle me-2"></i>Buyer places a buy request</li>
+                    <li class="mb-2 pb-2 border-bottom border-white border-opacity-25"><i class="bi bi-2-circle me-2"></i>Buyer sees <strong>these account details</strong></li>
+                    <li class="mb-2 pb-2 border-bottom border-white border-opacity-25"><i class="bi bi-3-circle me-2"></i>Buyer sends money to Admin directly</li>
+                    <li class="mb-2 pb-2 border-bottom border-white border-opacity-25"><i class="bi bi-4-circle me-2"></i>Buyer uploads payment screenshot</li>
+                    <li><i class="bi bi-5-circle me-2"></i>Admin approves → Order activated</li>
                 </ul>
             </div>
         </div>

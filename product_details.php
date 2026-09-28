@@ -381,11 +381,28 @@ include 'includes/header.php';
 
           <!-- Add to Cart -->
           <button type="submit"
-                  class="btn btn-success btn-lg rounded-pill fw-bold px-5 shadow-sm flex-grow-1">
+                  class="btn btn-outline-success btn-lg rounded-pill fw-bold px-5 flex-grow-1">
             <i class="bi bi-cart-plus me-2"></i>Add to Cart
           </button>
         </div>
       </form>
+      
+      <!-- Direct Buy / Send Buy Request -->
+      <?php if ((int)$product['stock_quantity'] > 0): ?>
+      <form action="cart.php" method="POST" class="mb-3" id="buyNowForm">
+        <input type="hidden" name="action" value="add">
+        <input type="hidden" name="product_id" value="<?php echo $product_id; ?>">
+        <input type="hidden" name="quantity" id="buyNowQty" value="1">
+        <input type="hidden" name="redirect" value="checkout">
+        <button type="submit" class="btn btn-success btn-lg rounded-pill fw-bold w-100 shadow-sm">
+          <i class="bi bi-send me-2"></i>Send Buy Request
+        </button>
+      </form>
+      <p class="text-muted small text-center mb-3">
+        <i class="bi bi-info-circle me-1"></i>
+        After placing your request, you will see payment instructions and can upload your payment receipt.
+      </p>
+      <?php endif; ?>
       <?php else: ?>
       <div class="alert alert-danger d-inline-block px-4 rounded-pill mb-4 fw-bold">
         <i class="bi bi-x-circle me-1"></i> Out of Stock

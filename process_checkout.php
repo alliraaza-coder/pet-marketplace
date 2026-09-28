@@ -147,17 +147,18 @@ try {
         $stmt_item->bind_param("iiiidd", $order_id, $item['id'], $item['seller_id'], $item['quantity'], $item['price'], $item['total']);
         $stmt_item->execute();
         
-        // Reduce stock
-        $stmt_stock->bind_param("ii", $item['new_stock'], $item['id']);
-        $stmt_stock->execute();
-        
-        // If stock is zero, mark product as 'sold'
-        if ($item['new_stock'] === 0) {
-            $stmt_sold->bind_param("i", $item['id']);
-            $stmt_sold->execute();
-        }
+        // Phase 8 Amendment: Do NOT reduce stock at request time. 
+        // Stock will be verified and deducted when Admin approves the payment.
     }
     
+    // Create admin notification
+    $notif_title = "New Buy Request";
+    $notif_msg = "A new buy request ($order_number) was placed. Awaiting payment proof.";
+    $notif_link = "escrow.php";
+    $notif_stmt = $conn->prepare("INSERT INTO admin_notifications (type, title, message, link, order_id) VALUES ('order', ?, ?, ?, ?)");
+    $notif_stmt->bind_param("sssi", $notif_title, $notif_msg, $notif_link, $order_id);
+    $notif_stmt->execute();
+
     // Commit transaction
     $conn->commit();
     

@@ -28,6 +28,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <a href="transactions.php" class="<?php echo $current_page === 'transactions.php' ? 'active' : ''; ?>"><i class="bi bi-receipt me-2"></i> Transactions</a>
     <a href="reports.php" class="<?php echo $current_page === 'reports.php' ? 'active' : ''; ?>"><i class="bi bi-bar-chart-line me-2"></i> Reports</a>
     <a href="settings.php" class="<?php echo $current_page === 'settings.php' ? 'active' : ''; ?>"><i class="bi bi-gear me-2"></i> Settings</a>
+    <a href="settings.php#payment-accounts" class="<?php echo ($current_page === 'settings.php') ? '' : ''; ?>" style="font-size:0.85rem; padding-left:36px;"><i class="bi bi-credit-card-2-back me-2"></i> Payment Accounts</a>
     <a href="profile.php" class="<?php echo $current_page === 'profile.php' ? 'active' : ''; ?>"><i class="bi bi-person-gear me-2"></i> Profile</a>
     <a href="activity_logs.php" class="<?php echo $current_page === 'activity_logs.php' ? 'active' : ''; ?>"><i class="bi bi-journal-text me-2"></i> Activity Logs</a>
     <a href="../logout.php" class="text-danger mt-4 border-top"><i class="bi bi-box-arrow-right me-2"></i> Logout</a>

@@ -7,7 +7,7 @@ $page_title = "Admin Dashboard";
 $page_heading = "Dashboard Overview";
 include __DIR__ . '/partials/header.php';
 
-// ── 1. Real-time Metrics Queries ────────────────────────────
+// â”€â”€ 1. Real-time Metrics Queries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Users counts
 $u_res = $conn->query("
     SELECT 
@@ -26,30 +26,31 @@ $p_res = $conn->query("
     FROM products WHERE is_deleted = 0
 ")->fetch_assoc();
 
-// Orders counts
+// Orders counts & Products Sold
 $o_res = $conn->query("
     SELECT 
         COUNT(*) AS total_orders,
-        SUM(order_status = 'pending') AS pending_orders,
-        SUM(order_status = 'completed') AS completed_orders,
-        SUM(order_status = 'cancelled') AS cancelled_orders
+        SUM(payment_status = 'payment_submitted') AS pending_payment_requests,
+        SUM(payment_status NOT IN ('pending','payment_submitted','rejected')) AS approved_orders,
+        (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.payment_status NOT IN ('pending','payment_submitted','rejected')) AS total_products_sold
     FROM orders
 ")->fetch_assoc();
 
-// Financial counts Phase 8
+// Financial counts Phase 8 Accurate
 $f_res = $conn->query("
     SELECT 
         COALESCE(SUM(CASE WHEN payment_status NOT IN ('pending','payment_submitted','rejected') THEN grand_total ELSE 0 END), 0) AS total_payments_received,
         COALESCE(SUM(CASE WHEN payment_status IN ('seller_payment_sent', 'seller_payment_received') THEN seller_payment_amount ELSE 0 END), 0) AS total_paid_to_sellers,
         COALESCE(SUM(CASE WHEN payment_status IN ('refund_sent', 'refund_received') THEN buyer_refund_amount ELSE 0 END), 0) AS total_refunds_sent,
         COALESCE(SUM(CASE WHEN payment_status = 'payment_submitted' THEN grand_total ELSE 0 END), 0) AS pending_buyer_payments,
-        COALESCE(SUM(CASE WHEN payment_status = 'held' AND seller_delivered=1 AND buyer_received=1 AND admin_verified=1 AND seller_payment_sent_at IS NULL THEN grand_total ELSE 0 END), 0) AS pending_seller_payments,
-        COALESCE(SUM(CASE WHEN payment_status IN ('held','refund_submitted') AND order_status='cancelled' AND buyer_refund_sent_at IS NULL THEN grand_total ELSE 0 END), 0) AS pending_refunds,
-        COALESCE(SUM(CASE WHEN payment_status = 'held' THEN grand_total ELSE 0 END), 0) AS escrow_balance
+        COALESCE(SUM(CASE WHEN payment_status = 'held' AND seller_delivered=1 AND buyer_received=1 AND admin_verified=1 AND seller_payment_sent_at IS NULL THEN seller_payment_amount ELSE (CASE WHEN payment_status='held' THEN grand_total ELSE 0 END) END), 0) AS pending_seller_payments,
+        COALESCE(SUM(CASE WHEN payment_status IN ('held','refund_submitted') AND order_status='cancelled' AND buyer_refund_sent_at IS NULL THEN buyer_refund_amount ELSE (CASE WHEN order_status='cancelled' THEN grand_total ELSE 0 END) END), 0) AS pending_refunds
     FROM orders
 ")->fetch_assoc();
 
-// ── 2. Chart Data (Monthly Revenue & Orders last 6 months) ──
+$admin_held_balance = $f_res['total_payments_received'] - $f_res['total_paid_to_sellers'] - $f_res['total_refunds_sent'];
+
+// â”€â”€ 2. Chart Data (Monthly Revenue & Orders last 6 months) â”€â”€
 $chart_months = [];
 $chart_revenue = [];
 $chart_orders = [];
@@ -80,7 +81,7 @@ for ($i = 5; $i >= 0; $i--) {
     $chart_users[] = (int)$usr_stmt->get_result()->fetch_assoc()['cnt'];
 }
 
-// ── 3. Recent Activity Lists ─────────────────────────────────
+// â”€â”€ 3. Recent Activity Lists â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $recent_orders = $conn->query("
     SELECT o.id, o.order_number, o.grand_total, o.order_status, o.payment_status, o.created_at, u.first_name, u.last_name
     FROM orders o JOIN users u ON o.user_id = u.id
@@ -108,125 +109,109 @@ $recent_transactions = $conn->query("
 ");
 ?>
 
-<!-- ── 14 Stat Cards ────────────────────────────────────── -->
+<!-- Phase 8: Financial & Marketplace Stat Cards -->
 <div class="row g-3 mb-4">
-    <!-- Total Users -->
-    <div class="col-6 col-md-3 col-xl-2">
-        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center">
-            <div class="text-primary mb-1"><i class="bi bi-people fs-3"></i></div>
-            <h4 class="fw-bold mb-0"><?php echo number_format($u_res['total_users']); ?></h4>
-            <span class="text-muted small">Total Users</span>
+    <!-- Admin Held Balance (Prominent) -->
+    <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm stat-card bg-success text-white p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-white-50 small text-uppercase fw-bold">Admin Held Balance</span>
+                    <h3 class="fw-bold mb-0 mt-1"><?php echo $site_settings['currency'] . number_format($admin_held_balance, 2); ?></h3>
+                    <small class="text-white-50">(Gross Received - Paid - Refunded)</small>
+                </div>
+                <div class="text-white-50"><i class="bi bi-safe fs-1"></i></div>
+            </div>
         </div>
     </div>
-    <!-- Total Buyers -->
-    <div class="col-6 col-md-3 col-xl-2">
-        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center">
-            <div class="text-info mb-1"><i class="bi bi-person-check fs-3"></i></div>
-            <h4 class="fw-bold mb-0"><?php echo number_format($u_res['total_buyers']); ?></h4>
-            <span class="text-muted small">Total Buyers</span>
+    <div class="col-12 col-md-8">
+        <div class="row g-3">
+            <div class="col-6 col-md-4">
+                <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100">
+                    <div class="text-success mb-1"><i class="bi bi-box-arrow-in-down fs-4"></i></div>
+                    <h5 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($f_res['total_payments_received'], 0); ?></h5>
+                    <span class="text-muted small">Total Buyer Payments</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-4">
+                <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100">
+                    <div class="text-primary mb-1"><i class="bi bi-box-arrow-up fs-4"></i></div>
+                    <h5 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($f_res['total_paid_to_sellers'], 0); ?></h5>
+                    <span class="text-muted small">Total Paid to Sellers</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-4">
+                <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100">
+                    <div class="text-danger mb-1"><i class="bi bi-arrow-counterclockwise fs-4"></i></div>
+                    <h5 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($f_res['total_refunds_sent'], 0); ?></h5>
+                    <span class="text-muted small">Total Refunds Sent</span>
+                </div>
+            </div>
         </div>
     </div>
-    <!-- Total Sellers -->
+    
+    <!-- Secondary Stats row 1 -->
     <div class="col-6 col-md-3 col-xl-2">
-        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center">
-            <div class="text-warning mb-1"><i class="bi bi-shop fs-3"></i></div>
-            <h4 class="fw-bold mb-0"><?php echo number_format($u_res['total_sellers']); ?></h4>
-            <span class="text-muted small">Total Sellers</span>
+        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-primary">
+            <h5 class="fw-bold mb-0 mt-2"><?php echo number_format($o_res['total_orders']); ?></h5>
+            <span class="text-muted small">Total Requests</span>
         </div>
     </div>
-    <!-- Total Products -->
     <div class="col-6 col-md-3 col-xl-2">
-        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center">
-            <div class="text-secondary mb-1"><i class="bi bi-box-seam fs-3"></i></div>
-            <h4 class="fw-bold mb-0"><?php echo number_format($p_res['total_products']); ?></h4>
+        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-warning">
+            <h5 class="fw-bold mb-0 mt-2 text-warning"><?php echo number_format($o_res['pending_payment_requests']); ?></h5>
+            <span class="text-muted small">Pending Payments</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-3 col-xl-2">
+        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-success">
+            <h5 class="fw-bold mb-0 mt-2 text-success"><?php echo number_format($o_res['approved_orders']); ?></h5>
+            <span class="text-muted small">Approved Orders</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-3 col-xl-2">
+        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-info">
+            <h5 class="fw-bold mb-0 mt-2"><?php echo number_format($o_res['total_products_sold']); ?></h5>
+            <span class="text-muted small">Products Sold</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-3 col-xl-2">
+        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-warning">
+            <h5 class="fw-bold mb-0 mt-2"><?php echo $site_settings['currency'] . number_format($f_res['pending_seller_payments'], 0); ?></h5>
+            <span class="text-muted small">Pending Payouts</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-3 col-xl-2">
+        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-danger">
+            <h5 class="fw-bold mb-0 mt-2"><?php echo $site_settings['currency'] . number_format($f_res['pending_refunds'], 0); ?></h5>
+            <span class="text-muted small">Pending Refunds</span>
+        </div>
+    </div>
+
+    <!-- Users / Products -->
+    <div class="col-6 col-md-4">
+        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100">
+            <div class="text-primary mb-1"><i class="bi bi-people fs-4"></i></div>
+            <h5 class="fw-bold mb-0"><?php echo number_format($u_res['total_buyers']); ?> / <?php echo number_format($u_res['total_sellers']); ?></h5>
+            <span class="text-muted small">Total Buyers / Sellers</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100">
+            <div class="text-secondary mb-1"><i class="bi bi-box-seam fs-4"></i></div>
+            <h5 class="fw-bold mb-0"><?php echo number_format($p_res['total_products']); ?></h5>
             <span class="text-muted small">Total Products</span>
         </div>
     </div>
-    <!-- Active Products -->
-    <div class="col-6 col-md-3 col-xl-2">
-        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center">
-            <div class="text-success mb-1"><i class="bi bi-check-circle fs-3"></i></div>
-            <h4 class="fw-bold mb-0 text-success"><?php echo number_format($p_res['active_products']); ?></h4>
+    <div class="col-6 col-md-4">
+        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100">
+            <div class="text-success mb-1"><i class="bi bi-check-circle fs-4"></i></div>
+            <h5 class="fw-bold mb-0 text-success"><?php echo number_format($p_res['active_products']); ?></h5>
             <span class="text-muted small">Active Products</span>
         </div>
     </div>
-    <!-- Pending Products -->
-    <div class="col-6 col-md-3 col-xl-2">
-        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center">
-            <div class="text-danger mb-1"><i class="bi bi-hourglass-split fs-3"></i></div>
-            <h4 class="fw-bold mb-0 text-danger"><?php echo number_format($p_res['pending_products']); ?></h4>
-            <span class="text-muted small">Pending Products</span>
-        </div>
-    </div>
-
-    <!-- Total Orders -->
-    <div class="col-6 col-md-3 col-xl-2">
-        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center">
-            <div class="text-primary mb-1"><i class="bi bi-cart-check fs-3"></i></div>
-            <h4 class="fw-bold mb-0"><?php echo number_format($o_res['total_orders']); ?></h4>
-            <span class="text-muted small">Total Orders</span>
-        </div>
-    </div>
-    <!-- Pending Orders -->
-    <div class="col-6 col-md-3 col-xl-2">
-        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center">
-            <div class="text-warning mb-1"><i class="bi bi-clock-history fs-3"></i></div>
-            <h4 class="fw-bold mb-0 text-warning"><?php echo number_format($o_res['pending_orders']); ?></h4>
-            <span class="text-muted small">Pending Orders</span>
-        </div>
-    </div>
-    <!-- Completed Orders -->
-    <div class="col-6 col-md-3 col-xl-2">
-        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center">
-            <div class="text-success mb-1"><i class="bi bi-bag-check fs-3"></i></div>
-            <h4 class="fw-bold mb-0 text-success"><?php echo number_format($o_res['completed_orders']); ?></h4>
-            <span class="text-muted small">Completed Orders</span>
-        </div>
-    </div>
-    <!-- Cancelled Orders -->
-    <div class="col-6 col-md-3 col-xl-2">
-        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center">
-            <div class="text-danger mb-1"><i class="bi bi-x-circle fs-3"></i></div>
-            <h4 class="fw-bold mb-0 text-danger"><?php echo number_format($o_res['cancelled_orders']); ?></h4>
-            <span class="text-muted small">Cancelled Orders</span>
-        </div>
-    </div>
-
-    <!-- Total Revenue -->
-    <div class="col-6 col-md-3 col-xl-2">
-        <div class="card border-0 shadow-sm stat-card bg-success text-white p-3 text-center">
-            <div class="text-white-50 mb-1"><i class="bi bi-currency-dollar fs-3"></i></div>
-            <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($f_res['total_revenue'], 0); ?></h4>
-            <span class="text-white-50 small">Total Revenue</span>
-        </div>
-    </div>
-    <!-- Escrow Balance -->
-    <div class="col-6 col-md-3 col-xl-2">
-        <div class="card border-0 shadow-sm stat-card bg-warning text-dark p-3 text-center">
-            <div class="text-dark-50 mb-1"><i class="bi bi-shield-lock fs-3"></i></div>
-            <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($f_res['escrow_balance'], 0); ?></h4>
-            <span class="text-dark-50 small">Escrow Balance</span>
-        </div>
-    </div>
-    <!-- Released Payments -->
-    <div class="col-6 col-md-3 col-xl-2">
-        <div class="card border-0 shadow-sm stat-card bg-info text-white p-3 text-center">
-            <div class="text-white-50 mb-1"><i class="bi bi-wallet2 fs-3"></i></div>
-            <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($f_res['released_payments'], 0); ?></h4>
-            <span class="text-white-50 small">Released Payments</span>
-        </div>
-    </div>
-    <!-- Refunded Payments -->
-    <div class="col-6 col-md-3 col-xl-2">
-        <div class="card border-0 shadow-sm stat-card bg-danger text-white p-3 text-center">
-            <div class="text-white-50 mb-1"><i class="bi bi-arrow-counterclockwise fs-3"></i></div>
-            <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($f_res['refunded_payments'], 0); ?></h4>
-            <span class="text-white-50 small">Refunded Payments</span>
-        </div>
-    </div>
 </div>
-
-<!-- ── 4 Interactive Charts ─────────────────────────────── -->
+<!-- â”€â”€ 4 Interactive Charts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div class="row g-4 mb-4">
     <div class="col-lg-6">
         <div class="card border-0 shadow-sm p-4 h-100">
@@ -254,7 +239,7 @@ $recent_transactions = $conn->query("
     </div>
 </div>
 
-<!-- ── Recent Activity Tables ────────────────────────────── -->
+<!-- â”€â”€ Recent Activity Tables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div class="row g-4">
     <!-- Recent Orders -->
     <div class="col-lg-6">
@@ -391,12 +376,12 @@ new Chart(document.getElementById('usersChart'), {
 new Chart(document.getElementById('escrowChart'), {
     type: 'doughnut',
     data: {
-        labels: ['Held in Escrow', 'Released Payments', 'Refunded Payments'],
+        labels: ['Admin Held Balance', 'Paid to Sellers', 'Refunds Sent'],
         datasets: [{
             data: [
-                <?php echo (float)$f_res['escrow_balance']; ?>,
-                <?php echo (float)$f_res['released_payments']; ?>,
-                <?php echo (float)$f_res['refunded_payments']; ?>
+                <?php echo (float)$admin_held_balance; ?>,
+                <?php echo (float)$f_res['total_paid_to_sellers']; ?>,
+                <?php echo (float)$f_res['total_refunds_sent']; ?>
             ],
             backgroundColor: ['#ffc107', '#198754', '#dc3545']
         }]

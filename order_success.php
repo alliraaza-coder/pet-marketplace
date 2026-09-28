@@ -57,12 +57,13 @@ include 'includes/header.php';
                     </span>
                 </div>
                 
-                <h1 class="fw-bold mb-2">Thank You for Your Order!</h1>
-                <p class="text-muted mb-4 fs-5">Your order has been placed successfully and is now being processed.</p>
+                <h1 class="fw-bold mb-2">Buy Request Submitted Successfully!</h1>
+                <p class="text-muted mb-4 fs-5">Your request is currently <strong class="text-dark">Awaiting Payment</strong>.</p>
+                <p class="text-muted mb-4">To activate your order, please follow the payment instructions and upload your payment receipt.</p>
                 
                 <div class="d-flex flex-wrap justify-content-center gap-3">
-                    <a href="user/orders.php" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
-                        <i class="bi bi-receipt me-1"></i>Track Order Status
+                    <a href="user/order_details.php?id=<?php echo $order['id']; ?>" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+                        <i class="bi bi-wallet2 me-1"></i>Pay Now & Upload Receipt
                     </a>
                     <a href="shop.php" class="btn btn-outline-success rounded-pill px-4 fw-bold">
                         Continue Shopping

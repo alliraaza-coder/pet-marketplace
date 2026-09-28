@@ -23,12 +23,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['ord
             if (!$chk || $chk['payment_status'] !== 'payment_submitted') {
                 throw new Exception("This order does not have a submitted payment to verify.");
             }
+            
+            // Phase 8: Verify and deduct stock on approval
+            $items = $conn->query("SELECT oi.product_id, oi.quantity, p.title_en, p.stock_quantity FROM order_items oi JOIN products p ON oi.product_id = p.id WHERE oi.order_id = $order_id FOR UPDATE");
+            $stock_updates = [];
+            while ($item = $items->fetch_assoc()) {
+                if ($item['stock_quantity'] < $item['quantity']) {
+                    throw new Exception("Insufficient stock for '" . $item['title_en'] . "'. Only " . $item['stock_quantity'] . " available. Please reject or resolve.");
+                }
+                $stock_updates[] = [
+                    'id' => $item['product_id'],
+                    'new_stock' => $item['stock_quantity'] - $item['quantity']
+                ];
+            }
+            $stmt_stock = $conn->prepare("UPDATE products SET stock_quantity = ?, status = IF(? = 0, 'sold', status) WHERE id = ?");
+            foreach ($stock_updates as $upd_stock) {
+                $stmt_stock->bind_param("iii", $upd_stock['new_stock'], $upd_stock['new_stock'], $upd_stock['id']);
+                $stmt_stock->execute();
+            }
+
             $upd = $conn->prepare("UPDATE orders SET payment_status = 'held', order_status = 'pending' WHERE id = ?");
             $upd->bind_param("i", $order_id);
             $upd->execute();
 
             log_admin_activity($conn, $admin_id, "Approved Payment", "Payment verified for Order ID: $order_id. Escrow activated.");
-            if (function_exists('log_order_audit')) log_order_audit($conn, $order_id, "Admin approved payment", "Payment received and placed in escrow.", $admin_id);
+            if (function_exists('log_order_audit')) log_order_audit($conn, $order_id, "Admin approved payment", "Payment received and placed in escrow. Stock deducted.", $admin_id);
+            
+            // Send notification to seller
+            $notif_title = "New Order Active";
+            $notif_msg = "Buyer payment verified. You have a new active order.";
+            $notif_link = "orders.php";
+            $notif_stmt = $conn->prepare("INSERT INTO admin_notifications (type, title, message, link, order_id) SELECT 'order', ?, ?, ?, ? FROM order_items WHERE order_id = ? LIMIT 1");
+            $notif_stmt->bind_param("sssii", $notif_title, $notif_msg, $notif_link, $order_id, $order_id);
+            $notif_stmt->execute();
+            
             $conn->commit();
             $_SESSION['success'] = "Payment verified! Funds are now held in Escrow. Seller can now see and process the order.";
         } catch (Exception $e) {
@@ -115,8 +143,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['ord
             $upd->bind_param("sdsssii", $method, $amount, $tx_id, $now, $new_name, $admin_id, $order_id);
             $upd->execute();
 
-            $tx = $conn->prepare("INSERT INTO transactions (order_id, user_id, seller_id, transaction_type, amount, payment_method, status, reference_no, created_at) VALUES (?, ?, ?, 'release', ?, ?, 'seller_payment_sent', ?, ?)");
-            $tx->bind_param("iiidsss", $order_id, $chk['user_id'], $chk['seller_id'], $amount, $method, $tx_id, $now);
+            $tx = $conn->prepare("INSERT INTO transactions (order_id, user_id, seller_id, transaction_type, amount, payment_method, status, reference_no, receipt, admin_id, created_at) VALUES (?, ?, ?, 'release', ?, ?, 'seller_payment_sent', ?, ?, ?, ?)");
+            $tx->bind_param("iiidssssis", $order_id, $chk['user_id'], $chk['seller_id'], $amount, $method, $tx_id, $new_name, $admin_id, $now);
             $tx->execute();
 
             log_admin_activity($conn, $admin_id, "Paid Seller", "Sent seller payment for Order #{$chk['order_number']}");
@@ -157,8 +185,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['ord
             $upd->bind_param("sdsssii", $method, $amount, $tx_id, $now, $new_name, $admin_id, $order_id);
             $upd->execute();
 
-            $tx = $conn->prepare("INSERT INTO transactions (order_id, user_id, transaction_type, amount, payment_method, status, reference_no, created_at) VALUES (?, ?, 'refund', ?, ?, 'refund_sent', ?, ?)");
-            $tx->bind_param("iidsss", $order_id, $chk['user_id'], $amount, $method, $tx_id, $now);
+            $tx = $conn->prepare("INSERT INTO transactions (order_id, user_id, transaction_type, amount, payment_method, status, reference_no, receipt, admin_id, created_at) VALUES (?, ?, 'refund', ?, ?, 'refund_sent', ?, ?, ?, ?)");
+            $tx->bind_param("iidssssis", $order_id, $chk['user_id'], $amount, $method, $tx_id, $new_name, $admin_id, $now);
             $tx->execute();
 
             $items = $conn->query("SELECT product_id, quantity FROM order_items WHERE order_id = $order_id");

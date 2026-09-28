@@ -31,7 +31,7 @@ $user_partial = isset($user) ? $user : current_user($conn);
             ['href' => 'add_product.php',  'icon' => 'bi-plus-circle',  'label' => 'Add Product'],
             ['href' => 'orders.php',       'icon' => 'bi-bag-check',    'label' => 'My Orders'],
             ['href' => 'analytics.php',    'icon' => 'bi-graph-up',     'label' => 'Earnings'],
-            ['href' => '../user/profile.php','icon'=>'bi-person-gear',  'label' => 'Profile'],
+            ['href' => 'profile.php','icon'=>'bi-person-gear',  'label' => 'Profile'],
         ];
         foreach ($nav_items as $item):
             $is_active = ($current_page === $item['href']) ? 'active bg-warning text-dark fw-bold border-warning' : '';

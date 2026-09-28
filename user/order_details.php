@@ -95,6 +95,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['buyer_action'])) {
                 if ($upd_stmt->execute()) {
                     $_SESSION['success'] = "Payment proof submitted successfully. Waiting for admin verification.";
                     if (function_exists('log_order_audit')) log_order_audit($conn, $order_id, "Buyer submitted payment proof", "Reference: $reference", $user_id);
+                    
+                    // Create Admin Notification
+                    $notif_title = "Payment Proof Submitted";
+                    $notif_msg = "Buyer submitted payment proof for Order #" . $order['order_number'];
+                    $notif_link = "escrow.php";
+                    $notif_stmt = $conn->prepare("INSERT INTO admin_notifications (type, title, message, link, order_id) VALUES ('payment', ?, ?, ?, ?)");
+                    $notif_stmt->bind_param("sssi", $notif_title, $notif_msg, $notif_link, $order_id);
+                    $notif_stmt->execute();
+
                     $order['payment_status'] = 'payment_submitted';
                     $order['payment_reference'] = $reference;
                     $order['payment_proof'] = $filename;
@@ -287,8 +296,24 @@ include '../includes/header.php';
                     <!-- Action required prompts (Submit Proof or Confirm Delivery) -->
                     <?php if (in_array($order['payment_status'], ['pending', 'rejected']) && in_array($order['order_status'], ['pending', 'pending_payment'])): ?>
                         <div class="bg-warning bg-opacity-10 border border-warning rounded-3 p-4 text-center mt-3">
-                            <h5 class="fw-bold text-dark"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Action Required</h5>
-                            <p class="text-muted small mb-3">Please submit your payment proof to proceed with the order.</p>
+                            <h5 class="fw-bold text-dark"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Action Required: Submit Payment</h5>
+                            <p class="text-muted small mb-3">Your buy request is reserved. Please send the exact total amount of <strong><?php echo $site_settings['currency'] . number_format($order['grand_total'], 2); ?></strong> to one of our Admin accounts below, then upload the receipt.</p>
+                            
+                            <div class="text-start bg-white p-3 rounded shadow-sm mb-3 text-muted small border">
+                                <h6 class="fw-bold text-dark mb-2 border-bottom pb-1">Admin Payment Accounts</h6>
+                                <div class="row g-2">
+                                    <?php if(!empty($site_settings['pay_jazzcash_number'])): ?>
+                                    <div class="col-12"><strong class="text-dark">JazzCash:</strong> <?php echo htmlspecialchars($site_settings['pay_jazzcash_number']); ?> (<?php echo htmlspecialchars($site_settings['pay_jazzcash_name'] ?? ''); ?>)</div>
+                                    <?php endif; ?>
+                                    <?php if(!empty($site_settings['pay_easypaisa_number'])): ?>
+                                    <div class="col-12"><strong class="text-dark">EasyPaisa:</strong> <?php echo htmlspecialchars($site_settings['pay_easypaisa_number']); ?> (<?php echo htmlspecialchars($site_settings['pay_easypaisa_name'] ?? ''); ?>)</div>
+                                    <?php endif; ?>
+                                    <?php if(!empty($site_settings['pay_bank_account'])): ?>
+                                    <div class="col-12"><strong class="text-dark">Bank Transfer:</strong> <?php echo htmlspecialchars($site_settings['pay_bank_name']); ?> - <?php echo htmlspecialchars($site_settings['pay_bank_account']); ?> (<?php echo htmlspecialchars($site_settings['pay_bank_title']); ?>)</div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            
                             <form action="" method="POST" enctype="multipart/form-data" class="text-start bg-white p-3 rounded shadow-sm">
                                 <?php csrf_field(); ?>
                                 <input type="hidden" name="buyer_action" value="submit_payment">
@@ -306,7 +331,7 @@ include '../includes/header.php';
                             <form action="" method="POST" class="mt-3 text-center">
                                 <?php csrf_field(); ?>
                                 <button type="submit" name="buyer_action" value="cancel" class="btn btn-outline-danger btn-sm rounded-pill px-4 fw-bold" onclick="return confirm('Are you sure you want to cancel this order?');">
-                                    <i class="bi bi-x-circle me-1"></i>Cancel Order
+                                    <i class="bi bi-x-circle me-1"></i>Cancel Request
                                 </button>
                             </form>
                         </div>

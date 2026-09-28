@@ -8,19 +8,21 @@ require_role('user');
 $user = current_user($conn);
 $user_id = $user['id'];
 
-// 1. Fetch Total Pets Bought and Amount Spent (Phase 8 logic)
+// 1. Fetch User Metrics (Phase 8 Accurate)
 $stmt_metrics = $conn->prepare("
     SELECT 
-        COALESCE(SUM(oi.quantity), 0) AS total_pets_bought,
-        COALESCE((SELECT SUM(grand_total) FROM orders WHERE user_id = ? AND order_status = 'completed'), 0) AS total_amount_spent
-    FROM orders o
-    JOIN order_items oi ON o.id = oi.order_id
-    WHERE o.user_id = ? AND o.order_status = 'completed'
+        COUNT(*) AS total_buy_requests,
+        SUM(payment_status NOT IN ('pending','payment_submitted','rejected') AND order_status != 'completed') AS active_orders,
+        SUM(order_status = 'completed') AS completed_purchases,
+        (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.user_id = ? AND o.payment_status NOT IN ('pending','payment_submitted','rejected')) AS pets_purchased,
+        COALESCE(SUM(CASE WHEN payment_status NOT IN ('pending','payment_submitted','rejected','refund_sent','refund_received') THEN grand_total ELSE 0 END), 0) AS total_purchase_amount,
+        COALESCE(SUM(CASE WHEN payment_status IN ('refund_sent','refund_received') THEN buyer_refund_amount ELSE 0 END), 0) AS refunded_amount,
+        COALESCE(SUM(CASE WHEN payment_status = 'payment_submitted' THEN grand_total ELSE 0 END), 0) AS pending_payments
+    FROM orders WHERE user_id = ?
 ");
 $stmt_metrics->bind_param("ii", $user_id, $user_id);
 $stmt_metrics->execute();
 $metrics = $stmt_metrics->get_result()->fetch_assoc();
-
 // 2. Fetch Wishlist Items
 $stmt_wl = $conn->prepare("SELECT COUNT(id) as total_wishlist FROM wishlists WHERE user_id = ?");
 $stmt_wl->bind_param("i", $user_id);
@@ -85,38 +87,87 @@ include '../includes/header.php';
             <h2 class="fw-bold mb-4">Dashboard</h2>
             
                         <!-- Stats -->
-            <div class="row g-4 mb-4">
-                <div class="col-md-6 col-lg-3">
-                    <div class="card border-0 shadow-sm bg-primary text-white h-100 rounded-4">
-                        <div class="card-body p-4 text-center">
-                            <i class="bi bi-box-seam fs-1 mb-2"></i>
-                            <h3 class="fw-bold mb-0"><?php echo number_format($metrics['total_pets_bought']); ?></h3>
-                            <p class="mb-0 text-white-50 small">Total Pets Bought</p>
-                        </div>
-                    </div>
+                <div class="row g-4 mb-4">
+        <!-- Buy Requests -->
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100 rounded-4 py-3 px-2 text-center bg-white border-start border-4 border-secondary">
+                <div class="text-secondary mb-2"><i class="bi bi-envelope-paper fs-3"></i></div>
+                <h4 class="fw-bold mb-0"><?php echo number_format($metrics['total_buy_requests']); ?></h4>
+                <span class="text-muted small">Total Buy Requests</span>
+            </div>
+        </div>
+        <!-- Active Orders -->
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100 rounded-4 py-3 px-2 text-center bg-white border-start border-4 border-primary">
+                <div class="text-primary mb-2"><i class="bi bi-box-seam fs-3"></i></div>
+                <h4 class="fw-bold mb-0 text-primary"><?php echo number_format($metrics['active_orders']); ?></h4>
+                <span class="text-muted small">Active Orders</span>
+            </div>
+        </div>
+        <!-- Completed Purchases -->
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100 rounded-4 py-3 px-2 text-center bg-white border-start border-4 border-success">
+                <div class="text-success mb-2"><i class="bi bi-check-circle fs-3"></i></div>
+                <h4 class="fw-bold mb-0 text-success"><?php echo number_format($metrics['completed_purchases']); ?></h4>
+                <span class="text-muted small">Completed Purchases</span>
+            </div>
+        </div>
+        <!-- Pets Purchased -->
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100 rounded-4 py-3 px-2 text-center bg-white border-start border-4 border-info">
+                <div class="text-info mb-2"><i class="bi bi-emoji-heart-eyes fs-3"></i></div>
+                <h4 class="fw-bold mb-0"><?php echo number_format($metrics['pets_purchased']); ?></h4>
+                <span class="text-muted small">Pets Purchased</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row g-4 mb-4">
+        <!-- Total Purchase Amount -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-success text-white p-3 h-100 rounded-4 text-center">
+                <h6 class="text-white-50 mb-1">Total Purchase Amount</h6>
+                <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['total_purchase_amount'], 0); ?></h4>
+            </div>
+        </div>
+        <!-- Refunded Amount -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-danger text-white p-3 h-100 rounded-4 text-center">
+                <h6 class="text-white-50 mb-1">Refunded Amount</h6>
+                <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['refunded_amount'], 0); ?></h4>
+            </div>
+        </div>
+        <!-- Pending Payments -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-warning text-dark p-3 h-100 rounded-4 text-center">
+                <h6 class="text-dark-50 mb-1">Pending Payment Verification</h6>
+                <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['pending_payments'], 0); ?></h4>
+            </div>
+        </div>
+    </div>
+
+    <!-- Additional Stats -->
+    <div class="row g-4 mb-4">
+        <div class="col-6">
+            <div class="card border-0 shadow-sm h-100 rounded-4 py-3 px-3 d-flex flex-row align-items-center bg-white">
+                <div class="bg-light rounded-circle p-3 me-3 text-danger"><i class="bi bi-heart fs-4"></i></div>
+                <div>
+                    <h5 class="fw-bold mb-0"><?php echo number_format($total_wishlist); ?></h5>
+                    <span class="text-muted small">Wishlist Items</span>
                 </div>
-                <div class="col-md-6 col-lg-3">
-                    <div class="card border-0 shadow-sm bg-success text-white h-100 rounded-4">
-                        <div class="card-body p-4 text-center">
-                            <i class="bi bi-wallet2 fs-1 mb-2"></i>
-                            <h3 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['total_amount_spent'], 0); ?></h3>
-                            <p class="mb-0 text-white-50 small">Total Amount Spent</p>
-                        </div>
-                    </div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card border-0 shadow-sm h-100 rounded-4 py-3 px-3 d-flex flex-row align-items-center bg-white">
+                <div class="bg-light rounded-circle p-3 me-3 text-warning"><i class="bi bi-star-half fs-4"></i></div>
+                <div>
+                    <h5 class="fw-bold mb-0"><?php echo number_format($pending_reviews); ?></h5>
+                    <span class="text-muted small">Pending Reviews</span>
                 </div>
-                <div class="col-md-6 col-lg-3">
-                    <div class="card border-0 shadow-sm bg-danger text-white h-100 rounded-4">
-                        <div class="card-body p-4 text-center">
-                            <i class="bi bi-heart fs-1 mb-2"></i>
-                            <h3 class="fw-bold mb-0"><?php echo number_format($total_wishlist); ?></h3>
-                            <p class="mb-0 text-white-50 small">Wishlist Items</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6 col-lg-3">
-                    <div class="card border-0 shadow-sm bg-warning text-dark h-100 rounded-4">
-                        <div class="card-body p-4 text-center">
-                            <i class="bi bi-star-half fs-1 mb-2"></i>
+            </div>
+        </div>
+    </div>
+  <i class="bi bi-star-half fs-1 mb-2"></i>
                             <h3 class="fw-bold mb-0"><?php echo number_format($pending_reviews); ?></h3>
                             <p class="mb-0 text-dark-50 small">Pending Reviews</p>
                         </div>

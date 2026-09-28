@@ -46,9 +46,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
 
         // Redirect back to referring page or cart
-        $redirect = isset($_POST['redirect_back']) && !empty($_SERVER['HTTP_REFERER'])
-            ? $_SERVER['HTTP_REFERER']
-            : 'cart.php';
+        if (isset($_POST['redirect']) && $_POST['redirect'] === 'checkout') {
+            $redirect = 'checkout.php';
+        } else {
+            $redirect = isset($_POST['redirect_back']) && !empty($_SERVER['HTTP_REFERER'])
+                ? $_SERVER['HTTP_REFERER']
+                : 'cart.php';
+        }
         header('Location: ' . $redirect);
         exit;
     }
