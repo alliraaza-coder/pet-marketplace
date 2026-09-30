@@ -14,7 +14,7 @@ $feat_stmt = $conn->prepare(
      FROM   products p
      LEFT JOIN categories c ON p.category_id = c.id
      LEFT JOIN users      u ON p.seller_id   = u.id
-     WHERE  p.status = 'active' AND p.is_deleted = 0 AND p.listing_type = 'store' AND p.stock_quantity > 0
+     WHERE  p.status IN ('active', 'sold') AND p.is_deleted = 0 AND p.listing_type = 'store'
      ORDER  BY p.is_featured DESC, p.created_at DESC
      LIMIT  4"
 );

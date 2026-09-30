@@ -19,12 +19,12 @@ $query = "SELECT p.*, c.name_en AS category_name, u.city AS seller_city
           FROM products p 
           LEFT JOIN categories c ON p.category_id = c.id 
           LEFT JOIN users u ON p.seller_id = u.id 
-          WHERE p.status = 'active' AND p.is_deleted = 0 AND p.listing_type = 'store' AND p.stock_quantity > 0";
+          WHERE p.status IN ('active', 'sold') AND p.is_deleted = 0 AND p.listing_type = 'store'";
 
 $count_query = "SELECT COUNT(p.id) as total FROM products p 
                 LEFT JOIN categories c ON p.category_id = c.id 
                 LEFT JOIN users u ON p.seller_id = u.id 
-                WHERE p.status = 'active' AND p.is_deleted = 0 AND p.listing_type = 'store' AND p.stock_quantity > 0";
+                WHERE p.status IN ('active', 'sold') AND p.is_deleted = 0 AND p.listing_type = 'store'";
 
 $params = [];
 $types = "";

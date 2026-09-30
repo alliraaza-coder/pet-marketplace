@@ -29,7 +29,7 @@ $query = "SELECT p.*,
      FROM   products   p
      LEFT JOIN categories c ON p.category_id = c.id
      LEFT JOIN users      u ON p.seller_id   = u.id
-     WHERE  p.status = 'active' AND p.listing_type = 'store' ";
+     WHERE  p.status IN ('active', 'sold') AND p.is_deleted = 0 AND p.listing_type = 'store' ";
 
 if ($product_id > 0) {
     $query .= "AND p.id = ? LIMIT 1";
@@ -99,7 +99,7 @@ $rel_stmt = $conn->prepare(
             c.name_en AS category_name
      FROM   products   p
      LEFT JOIN categories c ON p.category_id = c.id
-     WHERE  p.category_id = ? AND p.id != ? AND p.status = 'active' AND p.listing_type = 'store' AND p.stock_quantity > 0
+     WHERE  p.category_id = ? AND p.id != ? AND p.status IN ('active', 'sold') AND p.is_deleted = 0 AND p.listing_type = 'store' AND p.stock_quantity > 0
      ORDER  BY p.is_featured DESC, p.created_at DESC
      LIMIT  4"
 );
@@ -364,7 +364,7 @@ include 'includes/header.php';
       </p>
 
       <!-- ── Add to Cart form ────────────────────────────────────────── -->
-      <?php if ((int)$product['stock_quantity'] > 0): ?>
+      <?php if ((int)$product['stock_quantity'] > 0 && $product['status'] !== 'sold'): ?>
       <form action="cart.php" method="POST" class="mb-3">
         <input type="hidden" name="action"     value="add">
         <input type="hidden" name="product_id" value="<?php echo $product_id; ?>">
@@ -388,7 +388,7 @@ include 'includes/header.php';
       </form>
       
       <!-- Direct Buy / Send Buy Request -->
-      <?php if ((int)$product['stock_quantity'] > 0): ?>
+      <?php if ((int)$product['stock_quantity'] > 0 && $product['status'] !== 'sold'): ?>
       <form action="cart.php" method="POST" class="mb-3" id="buyNowForm">
         <input type="hidden" name="action" value="add">
         <input type="hidden" name="product_id" value="<?php echo $product_id; ?>">
@@ -551,4 +551,5 @@ include 'includes/header.php';
 </script>
 
 <?php include 'includes/footer.php'; ?>
+
 

@@ -27,6 +27,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = "Your account has been banned. Please contact support.";
             } elseif ($user['status'] === 'inactive') {
                 $error = "Your account is inactive. Please verify your email.";
+            } elseif ($user['status'] === 'pending') {
+                $error = "Your account registration is currently pending admin approval. Please wait for an update.";
+            } elseif ($user['status'] === 'rejected') {
+                // Fetch rejection reason
+                $reasonStmt = $conn->prepare("SELECT rejection_reason FROM users WHERE id = ?");
+                $reasonStmt->bind_param("i", $user['id']);
+                $reasonStmt->execute();
+                $reasonRes = $reasonStmt->get_result()->fetch_assoc();
+                $reason = $reasonRes['rejection_reason'] ?? "No reason provided.";
+                $error = "Your registration request was rejected.<br><strong>Reason:</strong> " . htmlspecialchars($reason);
             } else {
                 if (password_verify($password, $user['password'])) {
                     // Regenerate session ID to prevent session fixation

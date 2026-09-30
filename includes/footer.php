@@ -8,16 +8,16 @@
                     <i class="bi bi-feather fs-2 text-success me-2"></i>
                     <h3 class="mb-0 fw-bold text-white"><?php echo $site_settings['site_name']; ?></h3>
                 </a>
-                <p class="text-muted mb-4 pe-lg-4">Your premium destination for buying and selling beautiful birds, lovely pets, high-quality accessories, and nutritious foods. A trusted marketplace for all pet lovers.</p>
-                <div class="d-flex align-items-center text-muted mb-2">
+                <p class="text-white-50 mb-4 pe-lg-4">Your premium destination for buying and selling beautiful birds, lovely pets, high-quality accessories, and nutritious foods. A trusted marketplace for all pet lovers.</p>
+                <div class="d-flex align-items-center text-white-50 mb-2">
                     <i class="bi bi-geo-alt text-success me-3 fs-5"></i>
                     <span>123 Pet Street, Animal City, PC 12345</span>
                 </div>
-                <div class="d-flex align-items-center text-muted mb-2">
+                <div class="d-flex align-items-center text-white-50 mb-2">
                     <i class="bi bi-telephone text-success me-3 fs-5"></i>
                     <span><?php echo $site_settings['phone']; ?></span>
                 </div>
-                <div class="d-flex align-items-center text-muted">
+                <div class="d-flex align-items-center text-white-50">
                     <i class="bi bi-envelope text-success me-3 fs-5"></i>
                     <span><?php echo $site_settings['support_email']; ?></span>
                 </div>
@@ -52,7 +52,7 @@
             <!-- Newsletter -->
             <div class="col-lg-4 col-md-6 mb-5 footer-widget">
                 <h4>Newsletter</h4>
-                <p class="text-muted mb-4">Subscribe to our newsletter and get 10% off your first purchase, plus weekly pet care tips!</p>
+                <p class="text-white-50 mb-4">Subscribe to our newsletter and get 10% off your first purchase, plus weekly pet care tips!</p>
                 <form action="#" method="POST" class="d-flex mb-4">
                     <input type="email" class="form-control bg-dark border-secondary text-white rounded-start-2 py-2" placeholder="Your Email Address" required>
                     <button type="submit" class="btn btn-success rounded-end-2 px-3"><i class="bi bi-send"></i></button>
@@ -71,13 +71,13 @@
     <div class="footer-bottom">
         <div class="container">
             <div class="row align-items-center">
-                <div class="col-md-6 text-center text-md-start mb-3 mb-md-0 text-muted">
+                <div class="col-md-6 text-center text-md-start mb-3 mb-md-0 text-white-50">
                     &copy; <?php echo date('Y'); ?> <?php echo $site_settings['site_name']; ?>. All rights reserved.
                 </div>
                 <div class="col-md-6 text-center text-md-end">
-                    <a href="<?php echo BASE_URL; ?>/privacy.php" class="text-muted text-decoration-none me-3">Privacy Policy</a>
-                    <a href="<?php echo BASE_URL; ?>/terms.php" class="text-muted text-decoration-none me-3">Terms of Service</a>
-                    <a href="<?php echo BASE_URL; ?>/refund.php" class="text-muted text-decoration-none">Refund Policy</a>
+                    <a href="<?php echo BASE_URL; ?>/privacy.php" class="text-white-50 text-decoration-none me-3">Privacy Policy</a>
+                    <a href="<?php echo BASE_URL; ?>/terms.php" class="text-white-50 text-decoration-none me-3">Terms of Service</a>
+                    <a href="<?php echo BASE_URL; ?>/refund.php" class="text-white-50 text-decoration-none">Refund Policy</a>
                 </div>
             </div>
         </div>
@@ -97,3 +97,4 @@
 
 </body>
 </html>
+

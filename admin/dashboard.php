@@ -117,7 +117,7 @@ $recent_transactions = $conn->query("
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <span class="text-white-50 small text-uppercase fw-bold">Admin Held Balance</span>
-                    <h3 class="fw-bold mb-0 mt-1"><?php echo $site_settings['currency'] . number_format($admin_held_balance, 2); ?></h3>
+                    <h3 class="fw-bold mb-0 mt-1"><?php echo $site_settings['currency'] . number_format($admin_held_balance ?? 0, 2); ?></h3>
                     <small class="text-white-50">(Gross Received - Paid - Refunded)</small>
                 </div>
                 <div class="text-white-50"><i class="bi bi-safe fs-1"></i></div>
@@ -129,21 +129,21 @@ $recent_transactions = $conn->query("
             <div class="col-6 col-md-4">
                 <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100">
                     <div class="text-success mb-1"><i class="bi bi-box-arrow-in-down fs-4"></i></div>
-                    <h5 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($f_res['total_payments_received'], 0); ?></h5>
+                    <h5 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($f_res['total_payments_received'] ?? 0, 0); ?></h5>
                     <span class="text-muted small">Total Buyer Payments</span>
                 </div>
             </div>
             <div class="col-6 col-md-4">
                 <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100">
                     <div class="text-primary mb-1"><i class="bi bi-box-arrow-up fs-4"></i></div>
-                    <h5 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($f_res['total_paid_to_sellers'], 0); ?></h5>
+                    <h5 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($f_res['total_paid_to_sellers'] ?? 0, 0); ?></h5>
                     <span class="text-muted small">Total Paid to Sellers</span>
                 </div>
             </div>
             <div class="col-6 col-md-4">
                 <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100">
                     <div class="text-danger mb-1"><i class="bi bi-arrow-counterclockwise fs-4"></i></div>
-                    <h5 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($f_res['total_refunds_sent'], 0); ?></h5>
+                    <h5 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($f_res['total_refunds_sent'] ?? 0, 0); ?></h5>
                     <span class="text-muted small">Total Refunds Sent</span>
                 </div>
             </div>
@@ -153,37 +153,37 @@ $recent_transactions = $conn->query("
     <!-- Secondary Stats row 1 -->
     <div class="col-6 col-md-3 col-xl-2">
         <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-primary">
-            <h5 class="fw-bold mb-0 mt-2"><?php echo number_format($o_res['total_orders']); ?></h5>
+            <h5 class="fw-bold mb-0 mt-2"><?php echo number_format($o_res['total_orders'] ?? 0); ?></h5>
             <span class="text-muted small">Total Requests</span>
         </div>
     </div>
     <div class="col-6 col-md-3 col-xl-2">
         <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-warning">
-            <h5 class="fw-bold mb-0 mt-2 text-warning"><?php echo number_format($o_res['pending_payment_requests']); ?></h5>
+            <h5 class="fw-bold mb-0 mt-2 text-warning"><?php echo number_format($o_res['pending_payment_requests'] ?? 0); ?></h5>
             <span class="text-muted small">Pending Payments</span>
         </div>
     </div>
     <div class="col-6 col-md-3 col-xl-2">
         <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-success">
-            <h5 class="fw-bold mb-0 mt-2 text-success"><?php echo number_format($o_res['approved_orders']); ?></h5>
+            <h5 class="fw-bold mb-0 mt-2 text-success"><?php echo number_format($o_res['approved_orders'] ?? 0); ?></h5>
             <span class="text-muted small">Approved Orders</span>
         </div>
     </div>
     <div class="col-6 col-md-3 col-xl-2">
         <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-info">
-            <h5 class="fw-bold mb-0 mt-2"><?php echo number_format($o_res['total_products_sold']); ?></h5>
+            <h5 class="fw-bold mb-0 mt-2"><?php echo number_format($o_res['total_products_sold'] ?? 0); ?></h5>
             <span class="text-muted small">Products Sold</span>
         </div>
     </div>
     <div class="col-6 col-md-3 col-xl-2">
         <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-warning">
-            <h5 class="fw-bold mb-0 mt-2"><?php echo $site_settings['currency'] . number_format($f_res['pending_seller_payments'], 0); ?></h5>
+            <h5 class="fw-bold mb-0 mt-2"><?php echo $site_settings['currency'] . number_format($f_res['pending_seller_payments'] ?? 0, 0); ?></h5>
             <span class="text-muted small">Pending Payouts</span>
         </div>
     </div>
     <div class="col-6 col-md-3 col-xl-2">
         <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-danger">
-            <h5 class="fw-bold mb-0 mt-2"><?php echo $site_settings['currency'] . number_format($f_res['pending_refunds'], 0); ?></h5>
+            <h5 class="fw-bold mb-0 mt-2"><?php echo $site_settings['currency'] . number_format($f_res['pending_refunds'] ?? 0, 0); ?></h5>
             <span class="text-muted small">Pending Refunds</span>
         </div>
     </div>
@@ -192,21 +192,21 @@ $recent_transactions = $conn->query("
     <div class="col-6 col-md-4">
         <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100">
             <div class="text-primary mb-1"><i class="bi bi-people fs-4"></i></div>
-            <h5 class="fw-bold mb-0"><?php echo number_format($u_res['total_buyers']); ?> / <?php echo number_format($u_res['total_sellers']); ?></h5>
+            <h5 class="fw-bold mb-0"><?php echo number_format($u_res['total_buyers'] ?? 0); ?> / <?php echo number_format($u_res['total_sellers'] ?? 0); ?></h5>
             <span class="text-muted small">Total Buyers / Sellers</span>
         </div>
     </div>
     <div class="col-6 col-md-4">
         <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100">
             <div class="text-secondary mb-1"><i class="bi bi-box-seam fs-4"></i></div>
-            <h5 class="fw-bold mb-0"><?php echo number_format($p_res['total_products']); ?></h5>
+            <h5 class="fw-bold mb-0"><?php echo number_format($p_res['total_products'] ?? 0); ?></h5>
             <span class="text-muted small">Total Products</span>
         </div>
     </div>
     <div class="col-6 col-md-4">
         <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100">
             <div class="text-success mb-1"><i class="bi bi-check-circle fs-4"></i></div>
-            <h5 class="fw-bold mb-0 text-success"><?php echo number_format($p_res['active_products']); ?></h5>
+            <h5 class="fw-bold mb-0 text-success"><?php echo number_format($p_res['active_products'] ?? 0); ?></h5>
             <span class="text-muted small">Active Products</span>
         </div>
     </div>
@@ -265,7 +265,7 @@ $recent_transactions = $conn->query("
                                 <tr>
                                     <td class="fw-bold text-primary">#<?php echo htmlspecialchars($o['order_number']); ?></td>
                                     <td><?php echo htmlspecialchars($o['first_name'] . ' ' . $o['last_name']); ?></td>
-                                    <td class="fw-bold"><?php echo $site_settings['currency'] . number_format($o['grand_total'], 2); ?></td>
+                                    <td class="fw-bold"><?php echo $site_settings['currency'] . number_format($o['grand_total'] ?? 0, 2); ?></td>
                                     <td><span class="badge bg-light text-dark border"><?php echo ucfirst(htmlspecialchars($o['payment_status'])); ?></span></td>
                                     <td><span class="badge bg-secondary rounded-pill"><?php echo ucfirst(str_replace('_',' ',$o['order_status'])); ?></span></td>
                                 </tr>
