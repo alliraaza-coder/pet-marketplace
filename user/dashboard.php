@@ -92,7 +92,7 @@ include '../includes/header.php';
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm h-100 rounded-4 py-3 px-2 text-center bg-white border-start border-4 border-secondary">
                 <div class="text-secondary mb-2"><i class="bi bi-envelope-paper fs-3"></i></div>
-                <h4 class="fw-bold mb-0"><?php echo number_format($metrics['total_buy_requests']); ?></h4>
+                <h4 class="fw-bold mb-0"><?php echo number_format($metrics['total_buy_requests'] ?? 0); ?></h4>
                 <span class="text-muted small">Total Buy Requests</span>
             </div>
         </div>
@@ -100,7 +100,7 @@ include '../includes/header.php';
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm h-100 rounded-4 py-3 px-2 text-center bg-white border-start border-4 border-primary">
                 <div class="text-primary mb-2"><i class="bi bi-box-seam fs-3"></i></div>
-                <h4 class="fw-bold mb-0 text-primary"><?php echo number_format($metrics['active_orders']); ?></h4>
+                <h4 class="fw-bold mb-0 text-primary"><?php echo number_format($metrics['active_orders'] ?? 0); ?></h4>
                 <span class="text-muted small">Active Orders</span>
             </div>
         </div>
@@ -108,7 +108,7 @@ include '../includes/header.php';
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm h-100 rounded-4 py-3 px-2 text-center bg-white border-start border-4 border-success">
                 <div class="text-success mb-2"><i class="bi bi-check-circle fs-3"></i></div>
-                <h4 class="fw-bold mb-0 text-success"><?php echo number_format($metrics['completed_purchases']); ?></h4>
+                <h4 class="fw-bold mb-0 text-success"><?php echo number_format($metrics['completed_purchases'] ?? 0); ?></h4>
                 <span class="text-muted small">Completed Purchases</span>
             </div>
         </div>
@@ -116,7 +116,7 @@ include '../includes/header.php';
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm h-100 rounded-4 py-3 px-2 text-center bg-white border-start border-4 border-info">
                 <div class="text-info mb-2"><i class="bi bi-emoji-heart-eyes fs-3"></i></div>
-                <h4 class="fw-bold mb-0"><?php echo number_format($metrics['pets_purchased']); ?></h4>
+                <h4 class="fw-bold mb-0"><?php echo number_format($metrics['pets_purchased'] ?? 0); ?></h4>
                 <span class="text-muted small">Pets Purchased</span>
             </div>
         </div>
@@ -127,21 +127,21 @@ include '../includes/header.php';
         <div class="col-md-4">
             <div class="card border-0 shadow-sm bg-success text-white p-3 h-100 rounded-4 text-center">
                 <h6 class="text-white-50 mb-1">Total Purchase Amount</h6>
-                <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['total_purchase_amount'], 0); ?></h4>
+                <h4 class="fw-bold mb-0"><?php echo htmlspecialchars($site_settings['currency'] ?? 'Rs') . number_format($metrics['total_purchase_amount'] ?? 0, 0); ?></h4>
             </div>
         </div>
         <!-- Refunded Amount -->
         <div class="col-md-4">
             <div class="card border-0 shadow-sm bg-danger text-white p-3 h-100 rounded-4 text-center">
                 <h6 class="text-white-50 mb-1">Refunded Amount</h6>
-                <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['refunded_amount'], 0); ?></h4>
+                <h4 class="fw-bold mb-0"><?php echo htmlspecialchars($site_settings['currency'] ?? 'Rs') . number_format($metrics['refunded_amount'] ?? 0, 0); ?></h4>
             </div>
         </div>
         <!-- Pending Payments -->
         <div class="col-md-4">
             <div class="card border-0 shadow-sm bg-warning text-dark p-3 h-100 rounded-4 text-center">
                 <h6 class="text-dark-50 mb-1">Pending Payment Verification</h6>
-                <h4 class="fw-bold mb-0"><?php echo $site_settings['currency'] . number_format($metrics['pending_payments'], 0); ?></h4>
+                <h4 class="fw-bold mb-0"><?php echo htmlspecialchars($site_settings['currency'] ?? 'Rs') . number_format($metrics['pending_payments'] ?? 0, 0); ?></h4>
             </div>
         </div>
     </div>
