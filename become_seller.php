@@ -88,7 +88,7 @@ include 'includes/header.php';
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-warning btn-lg rounded-pill fw-bold shadow">Upgrade My Account</button>
                         </div>
-                    </form>
+                    </form> 
                 </div>
             </div>
         </div>

@@ -201,4 +201,18 @@ function log_order_audit($conn, $order_id, $action, $details = '', $user_id = nu
     }
     return false;
 }
+
+/**
+ * Add user notification
+ */
+function add_user_notification($conn, $user_id, $type, $title, $message, $link = null) {
+    $stmt = $conn->prepare("INSERT INTO notifications (user_id, type, title, message, link) VALUES (?, ?, ?, ?, ?)");
+    if ($stmt) {
+        $stmt->bind_param("issss", $user_id, $type, $title, $message, $link);
+        $result = $stmt->execute();
+        $stmt->close();
+        return $result;
+    }
+    return false;
+}
 ?>

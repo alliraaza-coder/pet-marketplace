@@ -23,11 +23,15 @@ if (!$product_id && !$slug) {
 $query = "SELECT p.*, 
             c.name_en  AS category_name,
             c.slug     AS category_slug,
+            c.is_admin_only,
+            sc.name_en AS subcategory_name,
+            sc.slug    AS subcategory_slug,
             u.first_name, u.last_name, u.city AS seller_city,
             u.profile_pic, u.phone AS seller_phone,
             u.created_at AS seller_joined
      FROM   products   p
      LEFT JOIN categories c ON p.category_id = c.id
+     LEFT JOIN subcategories sc ON p.subcategory_id = sc.id
      LEFT JOIN users      u ON p.seller_id   = u.id
      WHERE  p.status IN ('active', 'sold') AND p.is_deleted = 0 AND p.listing_type = 'store' ";
 
@@ -92,6 +96,14 @@ $review_count = count($reviews);
 $avg_rating   = $review_count > 0
     ? round(array_sum(array_column($reviews, 'rating')) / $review_count, 1)
     : 0;
+
+// ── Fetch Seller Overall Rating ───────────────────────────────────────────
+$sel_rating_stmt = $conn->prepare("SELECT AVG(r.rating) as avg_rating, COUNT(r.id) as total_reviews FROM reviews r JOIN products p ON r.product_id = p.id WHERE p.seller_id = ? AND r.status = 'approved'");
+$sel_rating_stmt->bind_param("i", $product['seller_id']);
+$sel_rating_stmt->execute();
+$sel_rating_data = $sel_rating_stmt->get_result()->fetch_assoc();
+$seller_avg_rating = $sel_rating_data['avg_rating'] ? round($sel_rating_data['avg_rating'], 1) : 0;
+$seller_total_reviews = $sel_rating_data['total_reviews'];
 
 // ── Fetch Related Products (same category, exclude current) ───────────────
 $rel_stmt = $conn->prepare(
@@ -245,6 +257,11 @@ include 'includes/header.php';
             <?php echo htmlspecialchars($product['category_name'] ?? 'Uncategorized'); ?>
           </a>
         </li>
+        <?php if (!empty($product['subcategory_name'])): ?>
+        <li class="breadcrumb-item">
+          <span class="text-muted"><?php echo htmlspecialchars($product['subcategory_name']); ?></span>
+        </li>
+        <?php endif; ?>
         <li class="breadcrumb-item active" aria-current="page">
           <?php echo htmlspecialchars($product['title_en']); ?>
         </li>
@@ -294,6 +311,9 @@ include 'includes/header.php';
       <div class="d-flex justify-content-between align-items-center mb-2">
         <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2 fs-sm">
           <?php echo htmlspecialchars($product['category_name'] ?? 'Uncategorized'); ?>
+          <?php if (!empty($product['subcategory_name'])): ?>
+            &bull; <?php echo htmlspecialchars($product['subcategory_name']); ?>
+          <?php endif; ?>
         </span>
         <span class="text-muted small">
           <i class="bi bi-eye me-1"></i><?php echo number_format($product['views']); ?> views
@@ -450,7 +470,14 @@ include 'includes/header.php';
               Member since <?php echo date('M Y', strtotime($product['seller_joined'] ?? 'now')); ?>
             </small>
           </div>
-          <span class="badge bg-success rounded-pill">Verified Seller</span>
+          <div class="text-end">
+            <span class="badge bg-success rounded-pill d-block mb-1">Verified Seller</span>
+            <?php if ($seller_total_reviews > 0): ?>
+            <span class="badge bg-warning text-dark rounded-pill" data-bs-toggle="tooltip" title="<?php echo $seller_total_reviews; ?> total reviews">
+                <i class="bi bi-star-fill me-1"></i><?php echo $seller_avg_rating; ?> / 5
+            </span>
+            <?php endif; ?>
+          </div>
         </div>
       </div>
 

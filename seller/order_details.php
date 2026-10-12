@@ -128,6 +128,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['workflow_action'])) {
                         $stock_stmt->execute();
                     }
                 }
+                
+                // Notify Buyer
+                if (function_exists('add_user_notification')) {
+                    $msg = "Your order #" . $order['order_number'] . " is now " . ucfirst(str_replace('_', ' ', $new_status));
+                    add_user_notification($conn, $order['user_id'], 'order_update', 'Order Status Changed', $msg, 'user/order_details.php?id=' . $order_id);
+                }
             } else {
                 $_SESSION['error'] = "Failed to update order status.";
             }

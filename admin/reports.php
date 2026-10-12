@@ -63,6 +63,38 @@ $stmt_cat->bind_param("ss", $p1, $p2);
 $stmt_cat->execute();
 $top_categories = $stmt_cat->get_result();
 
+// Seller Performance
+$stmt_seller = $conn->prepare("
+    SELECT u.first_name, u.last_name, 
+           COUNT(DISTINCT o.id) AS total_orders,
+           COALESCE(SUM(oi.total), 0) AS total_sales
+    FROM order_items oi
+    JOIN users      u  ON oi.seller_id = u.id
+    JOIN orders     o  ON oi.order_id  = o.id
+    WHERE o.created_at BETWEEN ? AND ?
+      AND o.payment_status NOT IN ('pending','payment_submitted','rejected')
+    GROUP BY u.id
+    ORDER BY total_sales DESC
+    LIMIT 5
+");
+$stmt_seller->bind_param("ss", $p1, $p2);
+$stmt_seller->execute();
+$top_sellers = $stmt_seller->get_result();
+
+// Dispute Stats
+$stmt_disp = $conn->prepare("
+    SELECT 
+        COUNT(*) AS total_disputes,
+        SUM(CASE WHEN payment_status = 'held' THEN 1 ELSE 0 END) AS active_disputes,
+        SUM(CASE WHEN payment_status IN ('refund_sent','refund_received') THEN 1 ELSE 0 END) AS resolved_buyer,
+        SUM(CASE WHEN payment_status IN ('seller_payment_sent','seller_payment_received') THEN 1 ELSE 0 END) AS resolved_seller
+    FROM orders 
+    WHERE dispute_status = 1 AND created_at BETWEEN ? AND ?
+");
+$stmt_disp->bind_param("ss", $p1, $p2);
+$stmt_disp->execute();
+$dispute_stats = $stmt_disp->get_result()->fetch_assoc();
+
 // CSV Export — must happen BEFORE any HTML output
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     header('Content-Type: text/csv');
@@ -293,6 +325,86 @@ function fmt($cur, $v) { return $cur . ' ' . number_format((float)$v, 2); }
                         <?php endif; ?>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Sellers & Disputes Row -->
+    <div class="row g-4 mt-1">
+        <!-- Top Sellers -->
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white border-0 px-4 pt-4 pb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-people text-info me-2"></i>Top Performing Sellers</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light" style="font-size:.83rem;">
+                                <tr>
+                                    <th class="ps-4 py-3 border-0 text-muted">SELLER</th>
+                                    <th class="py-3 border-0 text-center text-muted">ORDERS</th>
+                                    <th class="pe-4 py-3 border-0 text-end text-muted">SALES</th>
+                                </tr>
+                            </thead>
+                            <tbody class="border-top-0">
+                                <?php if ($top_sellers && $top_sellers->num_rows > 0): 
+                                    while ($seller = $top_sellers->fetch_assoc()): ?>
+                                    <tr>
+                                        <td class="ps-4 py-3 fw-bold text-dark"><?= htmlspecialchars($seller['first_name'] . ' ' . $seller['last_name']) ?></td>
+                                        <td class="py-3 text-center"><span class="badge bg-light border text-dark"><?= number_format($seller['total_orders']) ?></span></td>
+                                        <td class="pe-4 py-3 text-end fw-bold text-success"><?= fmt($cur, $seller['total_sales']) ?></td>
+                                    </tr>
+                                <?php endwhile; else: ?>
+                                    <tr><td colspan="3" class="text-center py-4 text-muted">No seller data for this period.</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Dispute Stats -->
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white border-0 px-4 pt-4 pb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-exclamation-octagon text-danger me-2"></i>Dispute Statistics</h5>
+                </div>
+                <div class="card-body px-4 pb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="text-muted fw-semibold">Total Disputes Filed</span>
+                        <span class="fs-4 fw-bold text-dark"><?= number_format($dispute_stats['total_disputes'] ?? 0) ?></span>
+                    </div>
+                    <div class="progress mb-4" style="height:10px;">
+                        <?php 
+                            $tot = $dispute_stats['total_disputes'] ?? 0;
+                            $act = $dispute_stats['active_disputes'] ?? 0;
+                            $res_buy = $dispute_stats['resolved_buyer'] ?? 0;
+                            $res_sel = $dispute_stats['resolved_seller'] ?? 0;
+                            $pct_act = $tot > 0 ? ($act / $tot) * 100 : 0;
+                            $pct_buy = $tot > 0 ? ($res_buy / $tot) * 100 : 0;
+                            $pct_sel = $tot > 0 ? ($res_sel / $tot) * 100 : 0;
+                        ?>
+                        <div class="progress-bar bg-warning" style="width: <?= $pct_act ?>%"></div>
+                        <div class="progress-bar bg-primary" style="width: <?= $pct_buy ?>%"></div>
+                        <div class="progress-bar bg-success" style="width: <?= $pct_sel ?>%"></div>
+                    </div>
+                    <div class="d-flex flex-column gap-2">
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted"><i class="bi bi-circle-fill text-warning me-2" style="font-size:8px;"></i>Active / Unresolved</small>
+                            <small class="fw-bold"><?= $act ?></small>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted"><i class="bi bi-circle-fill text-primary me-2" style="font-size:8px;"></i>Resolved (Refunded Buyer)</small>
+                            <small class="fw-bold"><?= $res_buy ?></small>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted"><i class="bi bi-circle-fill text-success me-2" style="font-size:8px;"></i>Resolved (Paid Seller)</small>
+                            <small class="fw-bold"><?= $res_sel ?></small>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

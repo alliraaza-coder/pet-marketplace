@@ -27,6 +27,23 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <a href="escrow.php" class="<?php echo $current_page === 'escrow.php' ? 'active' : ''; ?>"><i class="bi bi-shield-lock me-2"></i> Escrow Payments</a>
     <a href="transactions.php" class="<?php echo $current_page === 'transactions.php' ? 'active' : ''; ?>"><i class="bi bi-receipt me-2"></i> Transactions</a>
     <a href="reports.php" class="<?php echo $current_page === 'reports.php' ? 'active' : ''; ?>"><i class="bi bi-bar-chart-line me-2"></i> Reports</a>
+    <?php
+        $pending_reviews_count = $conn->query("SELECT COUNT(*) as c FROM reviews WHERE status='pending'")->fetch_assoc()['c'] ?? 0;
+        $pending_disputes_count = $conn->query("SELECT COUNT(*) as c FROM orders WHERE dispute_status = 1 AND payment_status = 'held'")->fetch_assoc()['c'] ?? 0;
+        $pending_users_count = $conn->query("SELECT COUNT(*) as c FROM users WHERE status='pending'")->fetch_assoc()['c'] ?? 0;
+    ?>
+    <a href="reviews.php" class="<?php echo $current_page === 'reviews.php' ? 'active' : ''; ?>">
+        <i class="bi bi-star me-2"></i> Reviews
+        <?php if($pending_reviews_count > 0): ?><span class="badge bg-warning text-dark ms-auto"><?php echo $pending_reviews_count; ?></span><?php endif; ?>
+    </a>
+    <a href="disputes.php" class="<?php echo $current_page === 'disputes.php' ? 'active' : ''; ?>">
+        <i class="bi bi-exclamation-octagon me-2"></i> Disputes
+        <?php if($pending_disputes_count > 0): ?><span class="badge bg-danger ms-auto"><?php echo $pending_disputes_count; ?></span><?php endif; ?>
+    </a>
+    <a href="user_approval.php" class="<?php echo ($current_page === 'user_approval.php') ? 'active' : ''; ?>">
+        <i class="bi bi-person-check me-2"></i> User Approvals
+        <?php if($pending_users_count > 0): ?><span class="badge bg-danger ms-auto"><?php echo $pending_users_count; ?></span><?php endif; ?>
+    </a>
     <a href="settings.php" class="<?php echo $current_page === 'settings.php' ? 'active' : ''; ?>"><i class="bi bi-gear me-2"></i> Settings</a>
     <a href="settings.php#payment-accounts" class="<?php echo ($current_page === 'settings.php') ? '' : ''; ?>" style="font-size:0.85rem; padding-left:36px;"><i class="bi bi-credit-card-2-back me-2"></i> Payment Accounts</a>
     <a href="profile.php" class="<?php echo $current_page === 'profile.php' ? 'active' : ''; ?>"><i class="bi bi-person-gear me-2"></i> Profile</a>

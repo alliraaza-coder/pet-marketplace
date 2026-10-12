@@ -13,8 +13,8 @@ $seller_id = (int)$_SESSION['user_id'];
 $errors    = [];
 $old       = []; // repopulate form on error
 
-// ── Fetch categories ────────────────────────────────────────
-$cats = $conn->query("SELECT id, name_en, section FROM categories WHERE status = 'active' ORDER BY name_en");
+// ── Fetch categories (exclude admin-only like Market Specials) ──
+$cats = $conn->query("SELECT id, name_en, section FROM categories WHERE status = 'active' AND is_admin_only = 0 AND is_deleted = 0 ORDER BY name_en");
 
 // ── Handle POST ─────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -47,7 +47,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$title_en)      $errors[] = 'Product name is required.';
     if (!$description_en)$errors[] = 'Description is required.';
     if ($price <= 0)     $errors[] = 'Price must be greater than 0.';
-    if (!$category_id)   $errors[] = 'Please select a category.';
+    if (!$category_id) {
+        $errors[] = 'Please select a category.';
+    } else {
+        // Server-side validation: Market Specials / admin-only categories are restricted
+        $cat_chk = $conn->prepare("SELECT is_admin_only FROM categories WHERE id = ? AND status = 'active' AND is_deleted = 0");
+        $cat_chk->bind_param("i", $category_id);
+        $cat_chk->execute();
+        $cat_row = $cat_chk->get_result()->fetch_assoc();
+        if (!$cat_row) {
+            $errors[] = 'Invalid category selected.';
+        } elseif (!empty($cat_row['is_admin_only'])) {
+            $errors[] = 'Market Specials is an admin-only category. Sellers cannot list products here.';
+        }
+    }
 
     // Validate & upload images
     $allowed_types = ['image/jpeg','image/png','image/webp','image/gif'];

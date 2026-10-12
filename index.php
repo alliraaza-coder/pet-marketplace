@@ -22,7 +22,7 @@ $feat_stmt->execute();
 $featured_products = $feat_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 // ── Fetch Categories ────────────────────────────────────────────────────────
-$cat_result = $conn->query("SELECT * FROM categories WHERE status = 'active' ORDER BY id ASC LIMIT 6");
+$cat_result = $conn->query("SELECT * FROM categories WHERE status = 'active' AND is_deleted = 0 ORDER BY id ASC LIMIT 6");
 $categories  = $cat_result->fetch_all(MYSQLI_ASSOC);
 
 // ── Category section icon map ────────────────────────────────────────────────

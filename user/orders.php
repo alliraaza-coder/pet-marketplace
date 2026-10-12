@@ -49,6 +49,16 @@ include '../includes/header.php';
                     <a href="profile.php" class="list-group-item list-group-item-action py-3"><i class="bi bi-person me-2"></i> My Profile</a>
                     <a href="orders.php" class="list-group-item list-group-item-action active bg-success border-success py-3"><i class="bi bi-box-seam me-2"></i> My Orders</a>
                     <a href="../wishlist.php" class="list-group-item list-group-item-action py-3"><i class="bi bi-heart me-2"></i> Wishlist</a>
+                    <?php
+                        $notif_count_q = $conn->prepare("SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND is_read = 0");
+                        $notif_count_q->bind_param("i", $user_id);
+                        $notif_count_q->execute();
+                        $orders_page_unread = $notif_count_q->get_result()->fetch_assoc()['c'];
+                    ?>
+                    <a href="../notifications.php" class="list-group-item list-group-item-action py-3 d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-bell me-2"></i> Notifications</span>
+                        <?php if ($orders_page_unread > 0): ?><span class="badge bg-danger rounded-pill"><?php echo $orders_page_unread; ?></span><?php endif; ?>
+                    </a>
                     <a href="../logout.php" class="list-group-item list-group-item-action text-danger py-3"><i class="bi bi-box-arrow-right me-2"></i> Logout</a>
                 </div>
             </div>

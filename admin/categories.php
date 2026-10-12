@@ -18,11 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = sanitize_input($_POST['action']);
 
     if ($action === 'add') {
-        $name_en = sanitize_input($_POST['name_en']);
-        $name_ur = sanitize_input($_POST['name_ur'] ?? '');
-        $section = sanitize_input($_POST['section'] ?? 'birds');
-        $status  = sanitize_input($_POST['status'] ?? 'active');
-        $slug    = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $name_en)));
+        $name_en       = sanitize_input($_POST['name_en']);
+        $name_ur       = sanitize_input($_POST['name_ur'] ?? '');
+        $section       = sanitize_input($_POST['section'] ?? 'birds');
+        $status        = sanitize_input($_POST['status'] ?? 'active');
+        $is_admin_only = !empty($_POST['is_admin_only']) ? 1 : 0;
+        $slug          = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $name_en)));
 
         $image = null;
         if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
@@ -35,8 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
         }
 
-        $stmt = $conn->prepare("INSERT INTO categories (name_en, name_ur, section, slug, image, status) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssssss", $name_en, $name_ur, $section, $slug, $image, $status);
+        $stmt = $conn->prepare("INSERT INTO categories (name_en, name_ur, section, slug, image, status, is_admin_only) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssssssi", $name_en, $name_ur, $section, $slug, $image, $status, $is_admin_only);
         if ($stmt->execute()) {
             log_admin_activity($conn, $admin_id, "Added Category", "Added: $name_en");
             $_SESSION['success'] = "Category added successfully.";
@@ -45,16 +46,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
 
     } elseif ($action === 'edit' && isset($_POST['category_id'])) {
-        $cat_id  = (int)$_POST['category_id'];
-        $name_en = sanitize_input($_POST['name_en']);
-        $name_ur = sanitize_input($_POST['name_ur'] ?? '');
-        $section = sanitize_input($_POST['section'] ?? 'birds');
-        $status  = sanitize_input($_POST['status'] ?? 'active');
-        $slug    = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $name_en)));
+        $cat_id        = (int)$_POST['category_id'];
+        $name_en       = sanitize_input($_POST['name_en']);
+        $name_ur       = sanitize_input($_POST['name_ur'] ?? '');
+        $section       = sanitize_input($_POST['section'] ?? 'birds');
+        $status        = sanitize_input($_POST['status'] ?? 'active');
+        $is_admin_only = !empty($_POST['is_admin_only']) ? 1 : 0;
+        $slug          = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $name_en)));
 
         $image_sql = '';
-        $params    = [$name_en, $name_ur, $section, $slug, $status];
-        $types     = 'sssss';
+        $params    = [$name_en, $name_ur, $section, $slug, $status, $is_admin_only];
+        $types     = 'sssssi';
 
         if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
             $upload_dir = '../assets/images/categories/';
@@ -71,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $params[] = $cat_id;
         $types   .= 'i';
 
-        $stmt = $conn->prepare("UPDATE categories SET name_en=?, name_ur=?, section=?, slug=?, status=? $image_sql WHERE id=?");
+        $stmt = $conn->prepare("UPDATE categories SET name_en=?, name_ur=?, section=?, slug=?, status=?, is_admin_only=? $image_sql WHERE id=?");
         $bind = array_merge([$types], $params);
         $tmp  = [];
         foreach ($bind as $k => $v) $tmp[$k] = &$bind[$k];
@@ -179,7 +181,12 @@ include __DIR__ . '/partials/header.php';
                                                  class="rounded-3 border shadow-sm"
                                                  style="width:48px;height:48px;object-fit:cover;flex-shrink:0;">
                                             <div class="ms-3">
-                                                <h6 class="mb-0 fw-bold text-dark"><?= htmlspecialchars($c['name_en']) ?></h6>
+                                                <div class="d-flex align-items-center flex-wrap gap-1">
+                                                    <h6 class="mb-0 fw-bold text-dark"><?= htmlspecialchars($c['name_en']) ?></h6>
+                                                    <?php if (!empty($c['is_admin_only'])): ?>
+                                                        <span class="badge bg-danger rounded-pill px-2" style="font-size:0.7rem;"><i class="bi bi-shield-lock me-1"></i>Admin Only</span>
+                                                    <?php endif; ?>
+                                                </div>
                                                 <?php if (!empty($c['name_ur'])): ?>
                                                     <small class="text-muted"><?= htmlspecialchars($c['name_ur']) ?></small>
                                                 <?php endif; ?>
@@ -311,6 +318,12 @@ include __DIR__ . '/partials/header.php';
                         </select>
                     </div>
                     <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="is_admin_only" value="1" id="is_admin_only">
+                            <label class="form-check-label fw-semibold small" for="is_admin_only"><i class="bi bi-shield-lock me-1 text-danger"></i>Admin Only (e.g. Market Specials - hidden from sellers)</label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label fw-semibold small">Category Image</label>
                         <input type="file" class="form-control rounded-3 border-0 bg-light" name="image" accept="image/*">
                         <div class="form-text">Recommended: 400×400px (JPG, PNG)</div>
@@ -363,6 +376,12 @@ include __DIR__ . '/partials/header.php';
                             <option value="inactive">Inactive</option>
                         </select>
                     </div>
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="is_admin_only" value="1" id="edit_is_admin_only">
+                            <label class="form-check-label fw-semibold small" for="edit_is_admin_only"><i class="bi bi-shield-lock me-1 text-danger"></i>Admin Only (e.g. Market Specials - hidden from sellers)</label>
+                        </div>
+                    </div>
                     <div class="mb-2">
                         <label class="form-label fw-semibold small">Category Image</label>
                         <div class="mb-2" id="edit_img_wrap" style="display:none;">
@@ -392,6 +411,7 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('edit_name_ur').value = cat.name_ur || '';
             document.getElementById('edit_section').value = cat.section || 'birds';
             document.getElementById('edit_status').value = cat.status || 'active';
+            document.getElementById('edit_is_admin_only').checked = (parseInt(cat.is_admin_only) === 1);
 
             const wrap = document.getElementById('edit_img_wrap');
             const img  = document.getElementById('edit_image_preview');

@@ -62,9 +62,25 @@ while ($row = $chart_result->fetch_assoc()) {
     $chart_earnings[] = (float)$row['earnings'];
 }
 
+// ── Order status breakdown ────────────────────────────────────
+$status_stmt = $conn->prepare(
+    "SELECT o.order_status, COUNT(DISTINCT o.id) AS count
+     FROM order_items oi
+     JOIN orders o ON oi.order_id = o.id
+     WHERE oi.seller_id = ?
+     GROUP BY o.order_status"
+);
+$status_stmt->bind_param('i', $seller_id);
+$status_stmt->execute();
+$status_result = $status_stmt->get_result();
+$status_counts = [];
+while ($row = $status_result->fetch_assoc()) {
+    $status_counts[$row['order_status']] = $row['count'];
+}
+
 // ── Top selling products ──────────────────────────────────────
 $top_stmt = $conn->prepare(
-    "SELECT p.id, p.title_en, p.price,
+    "SELECT p.id, p.title_en, p.price, p.views,
             SUM(oi.quantity) AS units_sold,
             SUM(oi.total)    AS revenue,
             (SELECT pi.image_url FROM product_images pi
@@ -191,7 +207,9 @@ include '../includes/header.php';
                         <div class="card-body p-3">
                             <?php if ($top_products->num_rows > 0): ?>
                             <ul class="list-group list-group-flush">
-                                <?php $rank = 1; while ($tp = $top_products->fetch_assoc()): ?>
+                                <?php $rank = 1; while ($tp = $top_products->fetch_assoc()): 
+                                    $conv_rate = $tp['views'] > 0 ? round(($tp['units_sold'] / $tp['views']) * 100, 1) : 0;
+                                ?>
                                 <li class="list-group-item d-flex align-items-center gap-3 px-0">
                                     <span class="fw-bold text-muted" style="min-width:20px;">#<?php echo $rank++; ?></span>
                                     <?php if ($tp['thumb']): ?>
@@ -203,7 +221,11 @@ include '../includes/header.php';
                                     <?php endif; ?>
                                     <div class="flex-grow-1 overflow-hidden">
                                         <p class="mb-0 fw-medium text-truncate small"><?php echo htmlspecialchars($tp['title_en']); ?></p>
-                                        <small class="text-muted"><?php echo (int)$tp['units_sold']; ?> sold</small>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <small class="text-muted"><?php echo (int)$tp['units_sold']; ?> sold</small>
+                                            <span class="badge bg-light text-dark border small" title="<?php echo (int)$tp['views']; ?> views"><i class="bi bi-eye me-1"></i><?php echo (int)$tp['views']; ?></span>
+                                            <?php if($conv_rate > 0): ?><span class="badge bg-success bg-opacity-10 text-success border border-success small" title="Conversion Rate"><?php echo $conv_rate; ?>%</span><?php endif; ?>
+                                        </div>
                                     </div>
                                     <div class="text-end">
                                         <p class="mb-0 fw-bold text-success small"><?php echo $site_settings['currency'] . number_format($tp['revenue'], 2); ?></p>
@@ -217,6 +239,44 @@ include '../includes/header.php';
                                 <p class="small">No sales yet.</p>
                             </div>
                             <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Order Status Breakdown ───────────────────────── -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm rounded-4">
+                        <div class="card-header bg-white border-0 pt-4 px-4 pb-0">
+                            <h5 class="fw-bold mb-0">Order Status Breakdown</h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row g-3 text-center">
+                                <?php 
+                                    $st_conf = [
+                                        'pending_payment' => ['info', 'Awaiting Payment'],
+                                        'pending' => ['warning', 'Pending'],
+                                        'accepted' => ['primary', 'Accepted'],
+                                        'preparing' => ['secondary', 'Preparing'],
+                                        'ready_for_shipment' => ['info', 'Ready'],
+                                        'out_for_delivery' => ['primary', 'Shipping'],
+                                        'delivered' => ['success', 'Delivered'],
+                                        'completed' => ['success', 'Completed'],
+                                        'cancelled' => ['danger', 'Cancelled']
+                                    ];
+                                    foreach ($st_conf as $k => $conf):
+                                        $cnt = $status_counts[$k] ?? 0;
+                                        if ($cnt == 0 && !in_array($k, ['completed', 'cancelled', 'pending'])) continue;
+                                ?>
+                                <div class="col-4 col-md-2">
+                                    <div class="p-3 border rounded-3 bg-light">
+                                        <h4 class="fw-bold text-<?php echo $conf[0]; ?> mb-1"><?php echo $cnt; ?></h4>
+                                        <div class="small text-muted text-uppercase" style="font-size:0.7rem;"><?php echo $conf[1]; ?></div>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
                     </div>
                 </div>

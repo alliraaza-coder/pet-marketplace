@@ -90,6 +90,23 @@ if (!empty($user['force_password_change']) && basename($_SERVER['PHP_SELF']) !==
                                     </li>
                                 <?php endwhile; ?>
                             <?php endif; ?>
+                            <?php 
+                                $disp_cnt = $conn->query("SELECT COUNT(*) as c FROM orders WHERE dispute_status = 1 AND payment_status = 'held'")->fetch_assoc()['c'] ?? 0;
+                                $rev_cnt = $conn->query("SELECT COUNT(*) as c FROM reviews WHERE status = 'pending'")->fetch_assoc()['c'] ?? 0;
+                                $usr_cnt = $conn->query("SELECT COUNT(*) as c FROM users WHERE status='pending'")->fetch_assoc()['c'] ?? 0;
+                            ?>
+                            <?php if ($disp_cnt > 0 || $rev_cnt > 0 || $usr_cnt > 0): ?>
+                            <li><hr class="dropdown-divider"></li>
+                            <?php if ($disp_cnt > 0): ?>
+                            <li><a class="dropdown-item py-2 text-danger" href="disputes.php"><i class="bi bi-exclamation-octagon me-2"></i><?php echo $disp_cnt; ?> Active Dispute(s)</a></li>
+                            <?php endif; ?>
+                            <?php if ($rev_cnt > 0): ?>
+                            <li><a class="dropdown-item py-2 text-warning" href="reviews.php"><i class="bi bi-star me-2"></i><?php echo $rev_cnt; ?> Pending Review(s)</a></li>
+                            <?php endif; ?>
+                            <?php if ($usr_cnt > 0): ?>
+                            <li><a class="dropdown-item py-2 text-primary" href="user_approval.php"><i class="bi bi-person-check me-2"></i><?php echo $usr_cnt; ?> Pending User(s)</a></li>
+                            <?php endif; ?>
+                            <?php endif; ?>
                         </ul>
                     </div>
 

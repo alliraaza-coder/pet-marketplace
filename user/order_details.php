@@ -33,12 +33,13 @@ if (!$order) {
 // Fetch order items with product details
 $item_stmt = $conn->prepare("
     SELECT oi.*, p.title_en, p.breed, p.listing_type,
-           (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.id AND pi.is_primary = 1 LIMIT 1) as image_url
+           (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.id AND pi.is_primary = 1 LIMIT 1) as image_url,
+           (SELECT r.id FROM reviews r WHERE r.product_id = p.id AND r.user_id = ? LIMIT 1) as review_id
     FROM order_items oi
     JOIN products p ON oi.product_id = p.id
     WHERE oi.order_id = ?
 ");
-$item_stmt->bind_param("i", $order['id']);
+$item_stmt->bind_param("ii", $user_id, $order['id']);
 $item_stmt->execute();
 $order_items = $item_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
@@ -123,6 +124,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['buyer_action'])) {
             $_SESSION['success'] = "Thank you for confirming receipt of your bird!";
             if (function_exists('log_order_audit')) log_order_audit($conn, $order_id, "Buyer confirmed receipt", "Delivery condition met.", $user_id);
             $order['buyer_received'] = 1;
+
+            // Notify seller
+            if (function_exists('add_user_notification')) {
+                $sel_res = $conn->query("SELECT seller_id FROM order_items WHERE order_id = $order_id LIMIT 1");
+                if ($sel_res && $sel = $sel_res->fetch_assoc()) {
+                    add_user_notification($conn, $sel['seller_id'], 'delivery', 'Delivery Confirmed', "The buyer has confirmed receipt of order #{$order['order_number']}.", 'seller/order_details.php?id='.$order_id);
+                }
+            }
         } else {
             $_SESSION['error'] = "Failed to update receipt status.";
         }
@@ -153,6 +162,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['buyer_action'])) {
                 $_SESSION['error'] = "Confirmation failed: " . $e->getMessage();
             }
         }
+    } elseif ($action === 'submit_review') {
+        $product_id = (int)$_POST['product_id'];
+        $rating = (int)$_POST['rating'];
+        $comment = sanitize_input($_POST['comment']);
+
+        if ($rating < 1 || $rating > 5) {
+            $_SESSION['error'] = "Invalid rating.";
+        } else {
+            if (!in_array($order['order_status'], ['completed', 'delivered'])) {
+                $_SESSION['error'] = "You can only review after receiving the item.";
+            } else {
+                $chk = $conn->prepare("SELECT id FROM reviews WHERE product_id = ? AND user_id = ?");
+                $chk->bind_param("ii", $product_id, $user_id);
+                $chk->execute();
+                if ($chk->get_result()->num_rows > 0) {
+                    $_SESSION['error'] = "You have already reviewed this product.";
+                } else {
+                    $ins = $conn->prepare("INSERT INTO reviews (product_id, user_id, rating, comment, status) VALUES (?, ?, ?, ?, 'pending')");
+                    $ins->bind_param("iiis", $product_id, $user_id, $rating, $comment);
+                    if ($ins->execute()) {
+                        $_SESSION['success'] = "Thank you! Your review has been submitted and is pending admin approval.";
+                    } else {
+                        $_SESSION['error'] = "Failed to submit review.";
+                    }
+                }
+            }
+        }
+        header("Location: order_details.php?id=$order_id");
+        exit;
+    } elseif ($action === 'open_dispute' && in_array($order['payment_status'], ['held'])) {
+        $reason = sanitize_input($_POST['dispute_reason']);
+        if (empty($reason)) {
+            $_SESSION['error'] = "Please provide a reason for the dispute.";
+        } else {
+            $upd = $conn->prepare("UPDATE orders SET dispute_status = 1, dispute_reason = ? WHERE id = ?");
+            $upd->bind_param("si", $reason, $order_id);
+            if ($upd->execute()) {
+                $_SESSION['success'] = "Dispute opened successfully. The escrow payout is now paused while Admin reviews your case.";
+                if (function_exists('log_order_audit')) log_order_audit($conn, $order_id, "Buyer opened dispute", "Reason: $reason", $user_id);
+                $order['dispute_status'] = 1;
+                $order['dispute_reason'] = $reason;
+                
+                // Notify admin
+                $notif_title = "New Dispute Opened";
+                $notif_msg = "Buyer opened a dispute for order #" . $order['order_number'];
+                $notif_link = "escrow.php";
+                $notif_stmt = $conn->prepare("INSERT INTO admin_notifications (type, title, message, link, order_id) VALUES ('dispute', ?, ?, ?, ?)");
+                $notif_stmt->bind_param("sssi", $notif_title, $notif_msg, $notif_link, $order_id);
+                $notif_stmt->execute();
+            } else {
+                $_SESSION['error'] = "Failed to open dispute.";
+            }
+        }
+        header("Location: order_details.php?id=$order_id");
+        exit;
     }
 }
 
@@ -338,12 +402,25 @@ include '../includes/header.php';
                     <?php elseif ($order['order_status'] === 'delivered' && $order['buyer_received'] == 0): ?>
                         <div class="mt-3 bg-light p-3 border rounded-3 text-center">
                             <p class="small text-muted mb-2">The seller has marked this order as delivered. Please confirm you have received it.</p>
-                            <form action="" method="POST">
-                                <?php csrf_field(); ?>
-                                <button type="submit" name="buyer_action" value="confirm_receipt" class="btn btn-success btn-sm w-100 rounded-pill fw-bold" onclick="return confirm('Confirm you have received the bird in good condition?');">
-                                    <i class="bi bi-check-circle me-1"></i>I Received Bird
+                            <div class="d-flex gap-2 justify-content-center">
+                                <form action="" method="POST" class="flex-grow-1">
+                                    <?php csrf_field(); ?>
+                                    <button type="submit" name="buyer_action" value="confirm_receipt" class="btn btn-success btn-sm w-100 rounded-pill fw-bold" onclick="return confirm('Confirm you have received the bird in good condition?');">
+                                        <i class="bi bi-check-circle me-1"></i>I Received Bird
+                                    </button>
+                                </form>
+                                <?php if ($order['dispute_status'] == 0): ?>
+                                <button type="button" class="btn btn-outline-danger btn-sm rounded-pill fw-bold" data-bs-toggle="modal" data-bs-target="#disputeModal">
+                                    <i class="bi bi-exclamation-octagon me-1"></i>Open Dispute
                                 </button>
-                            </form>
+                                <?php endif; ?>
+                            </div>
+                            <?php if ($order['dispute_status'] == 1): ?>
+                            <div class="mt-3 alert alert-danger border-0 py-2 mb-0 small text-start">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i><strong>Dispute Active</strong><br>
+                                You opened a dispute. Escrow payout is paused until Admin resolves it.
+                            </div>
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
 
@@ -371,6 +448,13 @@ include '../includes/header.php';
                                     <tr>
                                         <td class="ps-4">
                                             <h6 class="fw-bold mb-0 small"><?php echo htmlspecialchars($item['title_en']); ?></h6>
+                                            <?php if (in_array($order['order_status'], ['completed', 'delivered'])): ?>
+                                                <?php if ($item['review_id']): ?>
+                                                    <span class="badge bg-secondary mt-1" style="font-size:0.7rem;">Review Submitted</span>
+                                                <?php else: ?>
+                                                    <button type="button" class="btn btn-sm btn-outline-warning mt-1 rounded-pill py-0 px-2" style="font-size:0.75rem;" data-bs-toggle="modal" data-bs-target="#reviewModal<?php echo $item['product_id']; ?>"><i class="bi bi-star-fill me-1"></i>Leave Review</button>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
                                         </td>
                                         <td><?php echo $site_settings['currency'] . number_format($item['price'], 2); ?></td>
                                         <td><?php echo $item['quantity']; ?></td>
@@ -417,5 +501,111 @@ include '../includes/header.php';
         </div>
     </div>
 </div>
+
+<?php 
+// Review Modals
+if (in_array($order['order_status'], ['completed', 'delivered'])) {
+    foreach ($order_items as $item) {
+        if (!$item['review_id']) {
+?>
+<div class="modal fade" id="reviewModal<?php echo $item['product_id']; ?>" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title fw-bold">Review: <?php echo htmlspecialchars($item['title_en']); ?></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="" method="POST">
+                <div class="modal-body py-0">
+                    <?php csrf_field(); ?>
+                    <input type="hidden" name="buyer_action" value="submit_review">
+                    <input type="hidden" name="product_id" value="<?php echo $item['product_id']; ?>">
+                    
+                    <div class="mb-3 text-center">
+                        <label class="form-label d-block text-muted small fw-bold">Your Rating</label>
+                        <div class="rating-stars fs-2 text-warning" style="cursor:pointer;">
+                            <i class="bi bi-star-fill star-select" data-val="1"></i>
+                            <i class="bi bi-star-fill star-select" data-val="2"></i>
+                            <i class="bi bi-star-fill star-select" data-val="3"></i>
+                            <i class="bi bi-star-fill star-select" data-val="4"></i>
+                            <i class="bi bi-star-fill star-select" data-val="5"></i>
+                        </div>
+                        <input type="hidden" name="rating" id="ratingInput<?php echo $item['product_id']; ?>" value="5" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Your Review (Optional)</label>
+                        <textarea name="comment" class="form-control rounded-3 bg-light border-0" rows="3" placeholder="What did you like or dislike?"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning rounded-pill fw-bold text-dark px-4">Submit Review</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php 
+        }
+    }
+}
+?>
+
+<?php if ($order['dispute_status'] == 0 && $order['order_status'] === 'delivered'): ?>
+<div class="modal fade" id="disputeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-bottom-0 bg-danger text-white rounded-top-4">
+                <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-octagon me-2"></i>Open Dispute</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="" method="POST">
+                <div class="modal-body py-4">
+                    <?php csrf_field(); ?>
+                    <input type="hidden" name="buyer_action" value="open_dispute">
+                    <div class="alert alert-warning border-0 small">
+                        <strong>Note:</strong> Opening a dispute will pause the Escrow payment to the seller. Admin will review the case and contact both parties. Do not open a dispute unless the pet arrived sick, dead, or severely differs from the listing.
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label text-dark fw-bold small">Reason for Dispute</label>
+                        <textarea name="dispute_reason" class="form-control bg-light border-0" rows="4" placeholder="Please describe the issue in detail..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger rounded-pill fw-bold px-4" onclick="return confirm('Are you sure you want to open a dispute?');">Submit Dispute</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(modal => {
+        const stars = modal.querySelectorAll('.star-select');
+        const input = modal.querySelector('input[name="rating"]');
+        if (stars.length && input) {
+            stars.forEach((star, index) => {
+                star.addEventListener('click', () => {
+                    input.value = index + 1;
+                    stars.forEach((s, i) => {
+                        if (i <= index) {
+                            s.classList.remove('bi-star');
+                            s.classList.add('bi-star-fill');
+                        } else {
+                            s.classList.remove('bi-star-fill');
+                            s.classList.add('bi-star');
+                        }
+                    });
+                });
+            });
+        }
+    });
+});
+</script>
 
 <?php include '../includes/footer.php'; ?>

@@ -14,15 +14,25 @@ $sort = isset($_GET['sort']) ? sanitize_input($_GET['sort']) : 'newest';
 $min_price = isset($_GET['min_price']) ? (float)$_GET['min_price'] : 0;
 $max_price = isset($_GET['max_price']) ? (float)$_GET['max_price'] : 1000000;
 
+// Advanced filters
+$city_filter = isset($_GET['city']) ? sanitize_input($_GET['city']) : '';
+$gender_filter = isset($_GET['gender']) ? sanitize_input($_GET['gender']) : '';
+$vaccination_filter = isset($_GET['vaccination']) ? sanitize_input($_GET['vaccination']) : '';
+$age_filter = isset($_GET['age']) ? sanitize_input($_GET['age']) : '';
+
 // Base query (LEFT JOIN so missing category or seller won't hide the product, but enforce conditions)
-$query = "SELECT p.*, c.name_en AS category_name, u.city AS seller_city 
+$query = "SELECT p.*, c.name_en AS category_name, c.is_admin_only, sc.name_en AS subcategory_name, u.city AS seller_city,
+          (SELECT ROUND(AVG(r.rating),1) FROM reviews r WHERE r.product_id = p.id AND r.status = 'approved') AS avg_rating,
+          (SELECT COUNT(r.id) FROM reviews r WHERE r.product_id = p.id AND r.status = 'approved') AS review_count
           FROM products p 
           LEFT JOIN categories c ON p.category_id = c.id 
+          LEFT JOIN subcategories sc ON p.subcategory_id = sc.id 
           LEFT JOIN users u ON p.seller_id = u.id 
           WHERE p.status IN ('active', 'sold') AND p.is_deleted = 0 AND p.listing_type = 'store'";
 
 $count_query = "SELECT COUNT(p.id) as total FROM products p 
                 LEFT JOIN categories c ON p.category_id = c.id 
+                LEFT JOIN subcategories sc ON p.subcategory_id = sc.id 
                 LEFT JOIN users u ON p.seller_id = u.id 
                 WHERE p.status IN ('active', 'sold') AND p.is_deleted = 0 AND p.listing_type = 'store'";
 
@@ -57,6 +67,35 @@ if ($max_price > 0 && $max_price < 1000000) {
     $count_query .= " AND p.price >= ?";
     $params[] = $min_price;
     $types .= "d";
+}
+
+// Advanced filters application
+if ($city_filter) {
+    $query .= " AND p.city LIKE ?";
+    $count_query .= " AND p.city LIKE ?";
+    $params[] = "%$city_filter%";
+    $types .= "s";
+}
+
+if ($gender_filter && in_array($gender_filter, ['Male', 'Female', 'Pair', 'Unknown'])) {
+    $query .= " AND p.gender = ?";
+    $count_query .= " AND p.gender = ?";
+    $params[] = $gender_filter;
+    $types .= "s";
+}
+
+if ($vaccination_filter === '1' || $vaccination_filter === '0') {
+    $query .= " AND p.vaccination_status = ?";
+    $count_query .= " AND p.vaccination_status = ?";
+    $params[] = (int)$vaccination_filter;
+    $types .= "i";
+}
+
+if ($age_filter) {
+    $query .= " AND p.age LIKE ?";
+    $count_query .= " AND p.age LIKE ?";
+    $params[] = "%$age_filter%";
+    $types .= "s";
 }
 
 // Sorting
@@ -98,7 +137,21 @@ $total_products = $c_stmt->get_result()->fetch_assoc()['total'];
 $total_pages = ceil($total_products / $limit);
 
 // Fetch categories for sidebar
-$cat_result = $conn->query("SELECT * FROM categories WHERE status = 'active'");
+$cat_result = $conn->query("SELECT * FROM categories WHERE status = 'active' AND is_deleted = 0 ORDER BY id ASC");
+
+// Build query string for pagination links
+$qs_arr = [];
+if ($search) $qs_arr['q'] = $search;
+if ($category) $qs_arr['category'] = $category;
+if ($min_price > 0) $qs_arr['min_price'] = $min_price;
+if ($max_price < 1000000) $qs_arr['max_price'] = $max_price;
+if ($city_filter) $qs_arr['city'] = $city_filter;
+if ($gender_filter) $qs_arr['gender'] = $gender_filter;
+if ($vaccination_filter !== '') $qs_arr['vaccination'] = $vaccination_filter;
+if ($age_filter) $qs_arr['age'] = $age_filter;
+if ($sort !== 'newest') $qs_arr['sort'] = $sort;
+$qs = http_build_query($qs_arr);
+$qs_prefix = $qs ? '&' . $qs : '';
 
 include 'includes/header.php';
 ?>
@@ -123,7 +176,7 @@ include 'includes/header.php';
     <div class="row">
         <!-- Sidebar Filters -->
         <div class="col-lg-3 mb-4 mb-lg-0">
-            <div class="card border-0 shadow-sm rounded-4 sticky-top" style="top: 100px; z-index: 10;">
+            <div class="card border-0 shadow-sm rounded-4 sticky-top" style="top: 100px; z-index: 10; max-height: calc(100vh - 120px); overflow-y: auto;">
                 <div class="card-body p-4">
                     <form action="shop.php" method="GET" id="filterForm">
                         <?php if($search): ?>
@@ -158,17 +211,54 @@ include 'includes/header.php';
                         
                         <!-- Price Filter -->
                         <div class="mb-4">
-                            <h6 class="fw-bold mb-3">Price Range ($)</h6>
+                            <h6 class="fw-bold mb-3">Price Range (<?php echo htmlspecialchars($site_settings['currency'] ?? 'Rs'); ?>)</h6>
                             <div class="row g-2">
                                 <div class="col-6">
-                                    <input type="number" class="form-control form-control-sm" name="min_price" value="<?php echo $min_price > 0 ? $min_price : ''; ?>" placeholder="Min">
+                                    <input type="number" class="form-control form-control-sm bg-light border-0" name="min_price" value="<?php echo $min_price > 0 ? $min_price : ''; ?>" placeholder="Min">
                                 </div>
                                 <div class="col-6">
-                                    <input type="number" class="form-control form-control-sm" name="max_price" value="<?php echo $max_price < 1000000 ? $max_price : ''; ?>" placeholder="Max">
+                                    <input type="number" class="form-control form-control-sm bg-light border-0" name="max_price" value="<?php echo $max_price < 1000000 ? $max_price : ''; ?>" placeholder="Max">
                                 </div>
                             </div>
-                            <button type="submit" class="btn btn-sm btn-outline-success w-100 mt-2">Apply Price</button>
                         </div>
+
+                        <!-- Advanced Filters -->
+                        <h6 class="fw-bold mb-3 mt-4 border-top pt-4">Advanced Filters</h6>
+
+                        <!-- City Filter -->
+                        <div class="mb-3">
+                            <label class="form-label small text-muted mb-1">City</label>
+                            <input type="text" class="form-control form-control-sm bg-light border-0" name="city" value="<?php echo htmlspecialchars($city_filter); ?>" placeholder="e.g. Lahore">
+                        </div>
+
+                        <!-- Gender Filter -->
+                        <div class="mb-3">
+                            <label class="form-label small text-muted mb-1">Gender</label>
+                            <select class="form-select form-select-sm bg-light border-0" name="gender">
+                                <option value="">Any</option>
+                                <option value="Male" <?php echo $gender_filter === 'Male' ? 'selected' : ''; ?>>Male</option>
+                                <option value="Female" <?php echo $gender_filter === 'Female' ? 'selected' : ''; ?>>Female</option>
+                                <option value="Pair" <?php echo $gender_filter === 'Pair' ? 'selected' : ''; ?>>Pair</option>
+                            </select>
+                        </div>
+
+                        <!-- Age Filter -->
+                        <div class="mb-3">
+                            <label class="form-label small text-muted mb-1">Age</label>
+                            <input type="text" class="form-control form-control-sm bg-light border-0" name="age" value="<?php echo htmlspecialchars($age_filter); ?>" placeholder="e.g. 2 months">
+                        </div>
+
+                        <!-- Vaccination Filter -->
+                        <div class="mb-3">
+                            <label class="form-label small text-muted mb-1">Vaccination</label>
+                            <select class="form-select form-select-sm bg-light border-0" name="vaccination">
+                                <option value="">Any</option>
+                                <option value="1" <?php echo $vaccination_filter === '1' ? 'selected' : ''; ?>>Vaccinated</option>
+                                <option value="0" <?php echo $vaccination_filter === '0' ? 'selected' : ''; ?>>Not Vaccinated</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="btn btn-success w-100 mt-2 rounded-pill fw-bold shadow-sm">Apply Filters</button>
                     </form>
                 </div>
             </div>
@@ -206,6 +296,7 @@ include 'includes/header.php';
                                 <?php endif; ?>
                                 <div class="product-actions">
                                     <form action="wishlist.php" method="POST" class="d-inline">
+                                        <?php csrf_field(); ?>
                                         <input type="hidden" name="action" value="add">
                                         <input type="hidden" name="product_id" value="<?php echo $p['id']; ?>">
                                         <button type="submit" class="action-btn border-0" data-bs-toggle="tooltip" title="Add to Wishlist"><i class="bi bi-heart"></i></button>
@@ -215,11 +306,20 @@ include 'includes/header.php';
                             </div>
                             <div class="product-info">
                                 <span class="product-category"><?php echo htmlspecialchars($p['category_name'] ?? 'Uncategorized'); ?></span>
+                                <?php if ($p['avg_rating'] > 0): ?>
+                                <div class="d-flex align-items-center mt-1 mb-1" style="gap:2px; font-size:0.75rem;">
+                                    <?php for($s=1;$s<=5;$s++): ?>
+                                        <i class="bi bi-star<?php echo $s <= round($p['avg_rating']) ? '-fill text-warning' : ' text-muted'; ?>"></i>
+                                    <?php endfor; ?>
+                                    <span class="text-muted ms-1">(<?php echo $p['review_count']; ?>)</span>
+                                </div>
+                                <?php endif; ?>
                                 <a href="product_details.php?id=<?php echo $p['id']; ?>" class="text-decoration-none"><h3 class="product-title text-truncate-2"><?php echo htmlspecialchars($p['title_en']); ?></h3></a>
-                                <div class="product-price"><?php echo $site_settings['currency']; ?><?php echo number_format($p['price'], 2); ?></div>
+                                <div class="product-price"><?php echo htmlspecialchars($site_settings['currency'] ?? 'Rs'); ?> <?php echo number_format($p['price'], 2); ?></div>
                                 <div class="product-meta mt-3">
-                                    <span class="product-location"><i class="bi bi-geo-alt me-1"></i><?php echo htmlspecialchars($p['seller_city'] ?? 'Location N/A'); ?></span>
+                                    <span class="product-location"><i class="bi bi-geo-alt me-1"></i><?php echo htmlspecialchars($p['city'] ?? 'Location N/A'); ?></span>
                                     <form action="cart.php" method="POST" class="d-inline">
+                                        <?php csrf_field(); ?>
                                         <input type="hidden" name="action" value="add">
                                         <input type="hidden" name="product_id" value="<?php echo $p['id']; ?>">
                                         <input type="hidden" name="quantity" value="1">
@@ -245,17 +345,17 @@ include 'includes/header.php';
             <nav aria-label="Page navigation" class="mt-5">
                 <ul class="pagination justify-content-center">
                     <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
-                        <a class="page-link" href="?page=<?php echo $page - 1; ?><?php echo $search ? '&q='.$search : ''; ?><?php echo $category ? '&category='.$category : ''; ?>" aria-label="Previous">
+                        <a class="page-link" href="?page=<?php echo $page - 1; ?><?php echo $qs_prefix; ?>" aria-label="Previous">
                             <span aria-hidden="true">&laquo;</span>
                         </a>
                     </li>
                     <?php for($i = 1; $i <= $total_pages; $i++): ?>
                         <li class="page-item <?php echo $page == $i ? 'active' : ''; ?>">
-                            <a class="page-link <?php echo $page == $i ? 'bg-success border-success text-white' : 'text-success'; ?>" href="?page=<?php echo $i; ?><?php echo $search ? '&q='.$search : ''; ?><?php echo $category ? '&category='.$category : ''; ?>"><?php echo $i; ?></a>
+                            <a class="page-link <?php echo $page == $i ? 'bg-success border-success text-white' : 'text-success'; ?>" href="?page=<?php echo $i; ?><?php echo $qs_prefix; ?>"><?php echo $i; ?></a>
                         </li>
                     <?php endfor; ?>
                     <li class="page-item <?php echo $page >= $total_pages ? 'disabled' : ''; ?>">
-                        <a class="page-link text-success" href="?page=<?php echo $page + 1; ?><?php echo $search ? '&q='.$search : ''; ?><?php echo $category ? '&category='.$category : ''; ?>" aria-label="Next">
+                        <a class="page-link text-success" href="?page=<?php echo $page + 1; ?><?php echo $qs_prefix; ?>" aria-label="Next">
                             <span aria-hidden="true">&raquo;</span>
                         </a>
                     </li>
@@ -268,5 +368,3 @@ include 'includes/header.php';
 </div>
 
 <?php include 'includes/footer.php'; ?>
-
-

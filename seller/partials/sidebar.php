@@ -42,6 +42,20 @@ $user_partial = isset($user) ? $user : current_user($conn);
             <?php echo $item['label']; ?>
         </a>
         <?php endforeach; ?>
+        <?php
+            $seller_unread_notifs = 0;
+            $notif_count_stmt = $conn->prepare("SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND is_read = 0");
+            $notif_count_stmt->bind_param("i", $seller_id_check);
+            $notif_count_stmt->execute();
+            $seller_unread_notifs = $notif_count_stmt->get_result()->fetch_assoc()['c'];
+        ?>
+        <a href="../notifications.php"
+           class="list-group-item list-group-item-action py-3 d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-bell me-2"></i>Notifications</span>
+            <?php if ($seller_unread_notifs > 0): ?>
+            <span class="badge bg-danger rounded-pill"><?php echo $seller_unread_notifs; ?></span>
+            <?php endif; ?>
+        </a>
         <a href="../logout.php"
            class="list-group-item list-group-item-action py-3 text-danger">
             <i class="bi bi-box-arrow-right me-2"></i> Logout

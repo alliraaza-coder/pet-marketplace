@@ -49,13 +49,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['ord
             log_admin_activity($conn, $admin_id, "Approved Payment", "Payment verified for Order ID: $order_id. Escrow activated.");
             if (function_exists('log_order_audit')) log_order_audit($conn, $order_id, "Admin approved payment", "Payment received and placed in escrow. Stock deducted.", $admin_id);
             
-            // Send notification to seller
-            $notif_title = "New Order Active";
-            $notif_msg = "Buyer payment verified. You have a new active order.";
-            $notif_link = "orders.php";
-            $notif_stmt = $conn->prepare("INSERT INTO admin_notifications (type, title, message, link, order_id) SELECT 'order', ?, ?, ?, ? FROM order_items WHERE order_id = ? LIMIT 1");
-            $notif_stmt->bind_param("sssii", $notif_title, $notif_msg, $notif_link, $order_id, $order_id);
-            $notif_stmt->execute();
+            // Send notification to seller and buyer
+            if (function_exists('add_user_notification')) {
+                // Get seller ID from order items
+                $sel_res = $conn->query("SELECT seller_id FROM order_items WHERE order_id = $order_id LIMIT 1");
+                if ($sel_res && $sel = $sel_res->fetch_assoc()) {
+                    $order_number_display = $chk['order_number'] ?? $order_id;
+                    add_user_notification($conn, $sel['seller_id'], 'order', 'New Active Order', "Buyer payment verified. You have a new active order (#$order_number_display).", 'seller/order_details.php?id='.$order_id);
+                }
+                // Get buyer ID from orders
+                $buy_res = $conn->query("SELECT user_id, order_number FROM orders WHERE id = $order_id");
+                if ($buy_res && $buy = $buy_res->fetch_assoc()) {
+                    add_user_notification($conn, $buy['user_id'], 'order', 'Payment Approved', "Your payment for order #{$buy['order_number']} was approved and is now held in escrow.", 'user/order_details.php?id='.$order_id);
+                }
+            }
             
             $conn->commit();
             $_SESSION['success'] = "Payment verified! Funds are now held in Escrow. Seller can now see and process the order.";
@@ -119,6 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['ord
             
             if (!$chk) throw new Exception("Order not found.");
             if ($chk['payment_status'] !== 'held') throw new Exception("Payment is not held in escrow.");
+            if ($chk['dispute_status'] == 1) throw new Exception("Cannot pay seller. There is an active dispute on this order.");
             if ($chk['seller_delivered'] != 1) throw new Exception("Seller has not marked as delivered yet.");
             if ($chk['buyer_received'] != 1) throw new Exception("Buyer has not confirmed receipt yet.");
             if ($chk['admin_verified'] != 1) throw new Exception("Admin delivery verification is required before releasing.");
@@ -149,6 +157,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['ord
 
             log_admin_activity($conn, $admin_id, "Paid Seller", "Sent seller payment for Order #{$chk['order_number']}");
             if (function_exists('log_order_audit')) log_order_audit($conn, $order_id, "Admin sent payment to seller", "Waiting for seller to confirm receipt.", $admin_id);
+
+            // Notify seller
+            if (function_exists('add_user_notification')) {
+                add_user_notification($conn, $chk['seller_id'], 'payout', 'Payout Sent', "Admin has sent your payout for order #{$chk['order_number']}. Please confirm receipt.", 'seller/order_details.php?id='.$order_id);
+            }
 
             $conn->commit();
             $_SESSION['success'] = "Seller payment sent successfully. Waiting for seller to confirm receipt.";
@@ -198,6 +211,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['ord
 
             log_admin_activity($conn, $admin_id, "Refunded Buyer", "Sent refund for Order #{$chk['order_number']}");
             if (function_exists('log_order_audit')) log_order_audit($conn, $order_id, "Admin sent refund to buyer", "Waiting for buyer to confirm receipt.", $admin_id);
+            
+            // Notify buyer
+            if (function_exists('add_user_notification')) {
+                add_user_notification($conn, $chk['user_id'], 'refund', 'Refund Sent', "Admin has sent your refund for order #{$chk['order_number']}. Please confirm receipt.", 'user/order_details.php?id='.$order_id);
+            }
             
             $conn->commit();
             $_SESSION['success'] = "Refund sent to buyer successfully. Waiting for buyer confirmation.";

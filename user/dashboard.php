@@ -75,6 +75,16 @@ include '../includes/header.php';
                     <a href="profile.php" class="list-group-item list-group-item-action py-3"><i class="bi bi-person me-2"></i> My Profile</a>
                     <a href="orders.php" class="list-group-item list-group-item-action py-3"><i class="bi bi-box-seam me-2"></i> My Orders</a>
                     <a href="../wishlist.php" class="list-group-item list-group-item-action py-3"><i class="bi bi-heart me-2"></i> Wishlist</a>
+                    <?php
+                        $buyer_notif_stmt = $conn->prepare("SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND is_read = 0");
+                        $buyer_notif_stmt->bind_param("i", $user_id);
+                        $buyer_notif_stmt->execute();
+                        $buyer_unread = $buyer_notif_stmt->get_result()->fetch_assoc()['c'];
+                    ?>
+                    <a href="../notifications.php" class="list-group-item list-group-item-action py-3 d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-bell me-2"></i> Notifications</span>
+                        <?php if ($buyer_unread > 0): ?><span class="badge bg-danger rounded-pill"><?php echo $buyer_unread; ?></span><?php endif; ?>
+                    </a>
                     <a href="../logout.php" class="list-group-item list-group-item-action text-danger py-3"><i class="bi bi-box-arrow-right me-2"></i> Logout</a>
                 </div>
             </div>
@@ -84,8 +94,16 @@ include '../includes/header.php';
         <div class="col-lg-9">
             <?php display_messages(); ?>
             
-            <h2 class="fw-bold mb-4">Dashboard</h2>
-            
+            <!-- Page Title -->
+            <div class="mb-4">
+                <h3 class="fw-bold mb-1">
+                    Buyer Dashboard
+                </h3>
+                <p class="text-muted mb-0 small">
+                    Welcome back, <strong><?php echo htmlspecialchars($user['first_name']); ?></strong>!
+                    Here is an overview of your purchases and activity.
+                </p>
+            </div>
                         <!-- Stats -->
                 <div class="row g-4 mb-4">
         <!-- Buy Requests -->
