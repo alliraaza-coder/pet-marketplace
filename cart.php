@@ -69,8 +69,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($action === 'update' && $product_id > 0) {
         $quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 1;
         if ($quantity > 0 && isset($_SESSION['cart'][$product_id])) {
-            $_SESSION['cart'][$product_id]['quantity'] = $quantity;
-            $_SESSION['success'] = "Cart updated.";
+            $chk = $conn->prepare("SELECT id, title_en, stock_quantity, status FROM products WHERE id = ? AND is_deleted = 0 LIMIT 1");
+            $chk->bind_param("i", $product_id);
+            $chk->execute();
+            $p_row = $chk->get_result()->fetch_assoc();
+            $chk->close();
+
+            if (!$p_row || $p_row['status'] !== 'active' || (int)$p_row['stock_quantity'] <= 0) {
+                unset($_SESSION['cart'][$product_id]);
+                $_SESSION['error'] = "Item is out of stock and was removed from your cart.";
+            } elseif ($quantity > (int)$p_row['stock_quantity']) {
+                $_SESSION['cart'][$product_id]['quantity'] = (int)$p_row['stock_quantity'];
+                $_SESSION['error'] = "Quantity updated to maximum available stock ({$p_row['stock_quantity']}).";
+            } else {
+                $_SESSION['cart'][$product_id]['quantity'] = $quantity;
+                $_SESSION['success'] = "Cart updated.";
+            }
         } elseif ($quantity <= 0 && isset($_SESSION['cart'][$product_id])) {
             unset($_SESSION['cart'][$product_id]);
             $_SESSION['success'] = "Item removed from cart.";

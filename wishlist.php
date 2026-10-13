@@ -42,7 +42,7 @@ $query = "SELECT p.*, c.name_en as category_name
           FROM wishlists w
           JOIN products p ON w.product_id = p.id
           JOIN categories c ON p.category_id = c.id
-          WHERE w.user_id = ? AND p.status = 'active'
+          WHERE w.user_id = ? AND p.status IN ('active', 'sold', 'sold_out') AND p.is_deleted = 0
           ORDER BY w.created_at DESC";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $user_id);
@@ -82,8 +82,11 @@ include 'includes/header.php';
                         <button type="submit" class="btn btn-sm btn-danger rounded-circle shadow-sm" title="Remove"><i class="bi bi-x-lg"></i></button>
                     </form>
 
-                    <div class="product-img-wrapper">
+                    <div class="product-img-wrapper position-relative">
                         <img src="<?php echo $item_img; ?>" alt="<?php echo htmlspecialchars($item['title_en']); ?>">
+                        <?php if ($item['status'] === 'sold_out' || $item['status'] === 'sold' || (int)$item['stock_quantity'] <= 0): ?>
+                            <span class="position-absolute top-0 start-0 m-2 badge bg-danger text-white rounded-pill px-2 py-1 shadow-sm">Sold Out</span>
+                        <?php endif; ?>
                     </div>
                     <div class="product-info p-3">
                         <span class="product-category small text-muted"><?php echo htmlspecialchars($item['category_name']); ?></span>
@@ -93,6 +96,11 @@ include 'includes/header.php';
                         <div class="product-price fs-5 fw-bold text-success mb-3"><?php echo $site_settings['currency'] . number_format($item['price'], 2); ?></div>
 
                         <div class="d-flex gap-2">
+                            <?php if ($item['status'] === 'sold_out' || $item['status'] === 'sold' || (int)$item['stock_quantity'] <= 0): ?>
+                                <button type="button" class="btn btn-secondary btn-sm w-100 rounded-pill fw-bold" disabled>
+                                    <i class="bi bi-x-circle me-1"></i> Sold Out
+                                </button>
+                            <?php else: ?>
                             <form action="cart.php" method="POST" class="flex-grow-1">
                                 <input type="hidden" name="action" value="add">
                                 <input type="hidden" name="product_id" value="<?php echo $item['id']; ?>">
@@ -101,6 +109,7 @@ include 'includes/header.php';
                                     <i class="bi bi-cart-plus me-1"></i> Add to Cart
                                 </button>
                             </form>
+                            <?php endif; ?>
                             <a href="product_details.php?id=<?php echo $item['id']; ?>" class="btn btn-outline-success btn-sm rounded-pill px-3">
                                 <i class="bi bi-eye"></i>
                             </a>

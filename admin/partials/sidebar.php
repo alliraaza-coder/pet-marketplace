@@ -22,6 +22,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <a href="buyers.php" class="<?php echo ($current_page === 'buyers.php' || $current_page === 'buyer_details.php') ? 'active' : ''; ?>"><i class="bi bi-people me-2"></i> Buyers</a>
     <a href="sellers.php" class="<?php echo ($current_page === 'sellers.php' || $current_page === 'seller_details.php') ? 'active' : ''; ?>"><i class="bi bi-shop me-2"></i> Sellers</a>
     <a href="products.php" class="<?php echo ($current_page === 'products.php' || $current_page === 'product_details.php') ? 'active' : ''; ?>"><i class="bi bi-box me-2"></i> Products</a>
+    <a href="market_specials.php" class="<?php echo ($current_page === 'market_specials.php' || $current_page === 'add_market_special.php' || $current_page === 'edit_market_special.php' || $current_page === 'market_special_details.php') ? 'active' : ''; ?>"><i class="bi bi-stars me-2"></i> Market Specials</a>
     <a href="categories.php" class="<?php echo $current_page === 'categories.php' ? 'active' : ''; ?>"><i class="bi bi-tags me-2"></i> Categories</a>
     <a href="orders.php" class="<?php echo ($current_page === 'orders.php' || $current_page === 'order_details.php') ? 'active' : ''; ?>"><i class="bi bi-cart me-2"></i> Orders</a>
     <a href="escrow.php" class="<?php echo $current_page === 'escrow.php' ? 'active' : ''; ?>"><i class="bi bi-shield-lock me-2"></i> Escrow Payments</a>

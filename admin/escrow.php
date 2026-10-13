@@ -24,30 +24,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['ord
                 throw new Exception("This order does not have a submitted payment to verify.");
             }
             
-            // Phase 8: Verify and deduct stock on approval
-            $items = $conn->query("SELECT oi.product_id, oi.quantity, p.title_en, p.stock_quantity FROM order_items oi JOIN products p ON oi.product_id = p.id WHERE oi.order_id = $order_id FOR UPDATE");
-            $stock_updates = [];
-            while ($item = $items->fetch_assoc()) {
-                if ($item['stock_quantity'] < $item['quantity']) {
-                    throw new Exception("Insufficient stock for '" . $item['title_en'] . "'. Only " . $item['stock_quantity'] . " available. Please reject or resolve.");
-                }
-                $stock_updates[] = [
-                    'id' => $item['product_id'],
-                    'new_stock' => $item['stock_quantity'] - $item['quantity']
-                ];
-            }
-            $stmt_stock = $conn->prepare("UPDATE products SET stock_quantity = ?, status = IF(? = 0, 'sold', status) WHERE id = ?");
-            foreach ($stock_updates as $upd_stock) {
-                $stmt_stock->bind_param("iii", $upd_stock['new_stock'], $upd_stock['new_stock'], $upd_stock['id']);
-                $stmt_stock->execute();
-            }
-
             $upd = $conn->prepare("UPDATE orders SET payment_status = 'held', order_status = 'pending' WHERE id = ?");
             $upd->bind_param("i", $order_id);
             $upd->execute();
 
             log_admin_activity($conn, $admin_id, "Approved Payment", "Payment verified for Order ID: $order_id. Escrow activated.");
-            if (function_exists('log_order_audit')) log_order_audit($conn, $order_id, "Admin approved payment", "Payment received and placed in escrow. Stock deducted.", $admin_id);
+            if (function_exists('log_order_audit')) log_order_audit($conn, $order_id, "Admin approved payment", "Payment received and placed in escrow. Awaiting seller acceptance.", $admin_id);
             
             // Send notification to seller and buyer
             if (function_exists('add_user_notification')) {
@@ -202,12 +184,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['ord
             $tx->bind_param("iidssssis", $order_id, $chk['user_id'], $amount, $method, $tx_id, $new_name, $admin_id, $now);
             $tx->execute();
 
-            $items = $conn->query("SELECT product_id, quantity FROM order_items WHERE order_id = $order_id");
-            $stock_stmt = $conn->prepare("UPDATE products SET stock_quantity = stock_quantity + ?, status = IF(status='sold','active',status) WHERE id = ?");
-            while ($item = $items->fetch_assoc()) {
-                $stock_stmt->bind_param("ii", $item['quantity'], $item['product_id']);
-                $stock_stmt->execute();
-            }
+            // Phase 6: No automatic stock restoration on cancellation/refund.
+            // Seller must manually re-add stock via Edit Product if order is cancelled/refunded.
 
             log_admin_activity($conn, $admin_id, "Refunded Buyer", "Sent refund for Order #{$chk['order_number']}");
             if (function_exists('log_order_audit')) log_order_audit($conn, $order_id, "Admin sent refund to buyer", "Waiting for buyer to confirm receipt.", $admin_id);

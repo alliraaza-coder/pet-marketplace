@@ -98,10 +98,108 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['workflow_action'])) {
                 $_SESSION['error'] = "Confirmation failed: " . $e->getMessage();
             }
         }
+    } elseif ($action === 'accept') {
+        // Phase 6: Seller accepts order -> verify stock, deduct atomically, set status
+        if ($order['order_status'] === 'accepted') {
+            // Already accepted - prevent double deduction / idempotency
+            $_SESSION['info'] = "Order is already accepted.";
+        } else {
+            $conn->begin_transaction();
+            try {
+                // Re-verify order status with row lock to avoid race conditions
+                $chk_order = $conn->prepare("SELECT order_status FROM orders WHERE id = ? FOR UPDATE");
+                $chk_order->bind_param("i", $order_id);
+                $chk_order->execute();
+                $cur_order_row = $chk_order->get_result()->fetch_assoc();
+                $chk_order->close();
+
+                if (!$cur_order_row || $cur_order_row['order_status'] === 'accepted') {
+                    // Already accepted concurrently
+                    $conn->commit();
+                    $_SESSION['info'] = "Order is already accepted.";
+                } else {
+                    // Lock and verify items for this seller that have not been deducted yet
+                    $oi_stmt = $conn->prepare("SELECT id, product_id, quantity, stock_deducted FROM order_items WHERE order_id = ? AND seller_id = ? FOR UPDATE");
+                    $oi_stmt->bind_param("ii", $order_id, $seller_id);
+                    $oi_stmt->execute();
+                    $items_to_process = $oi_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                    $oi_stmt->close();
+
+                    if (empty($items_to_process)) {
+                        throw new Exception("No products found for this order.");
+                    }
+
+                    // 1. Verify sufficient stock for all items
+                    foreach ($items_to_process as $item) {
+                        if ($item['stock_deducted'] == 0) {
+                            $p_stmt = $conn->prepare("SELECT id, title_en, stock_quantity, status FROM products WHERE id = ? FOR UPDATE");
+                            $p_stmt->bind_param("i", $item['product_id']);
+                            $p_stmt->execute();
+                            $prod = $p_stmt->get_result()->fetch_assoc();
+                            $p_stmt->close();
+
+                            if (!$prod) {
+                                throw new Exception("Product ID #{$item['product_id']} not found.");
+                            }
+                            if ($prod['stock_quantity'] < $item['quantity']) {
+                                throw new Exception("Insufficient stock for '{$prod['title_en']}'. Available: {$prod['stock_quantity']}, Required: {$item['quantity']}.");
+                            }
+                        }
+                    }
+
+                    // 2. Deduct stock atomically and mark order_items as stock_deducted = 1
+                    foreach ($items_to_process as $item) {
+                        if ($item['stock_deducted'] == 0) {
+                            $deduct_stmt = $conn->prepare(
+                                "UPDATE products 
+                                 SET status = IF(stock_quantity - ? <= 0, 'sold_out', status),
+                                     stock_quantity = stock_quantity - ? 
+                                 WHERE id = ? AND stock_quantity >= ?"
+                            );
+                            $deduct_stmt->bind_param("iiii", $item['quantity'], $item['quantity'], $item['product_id'], $item['quantity']);
+                            $deduct_stmt->execute();
+
+                            if ($deduct_stmt->affected_rows === 0) {
+                                $deduct_stmt->close();
+                                throw new Exception("Could not deduct stock for product ID #{$item['product_id']}. Insufficient stock or concurrent modification.");
+                            }
+                            $deduct_stmt->close();
+
+                            $mark_oi = $conn->prepare("UPDATE order_items SET stock_deducted = 1 WHERE id = ?");
+                            $mark_oi->bind_param("i", $item['id']);
+                            $mark_oi->execute();
+                            $mark_oi->close();
+                        }
+                    }
+
+                    // 3. Update order status to accepted
+                    $upd_order = $conn->prepare("UPDATE orders SET order_status = 'accepted' WHERE id = ?");
+                    $upd_order->bind_param("i", $order_id);
+                    $upd_order->execute();
+                    $upd_order->close();
+
+                    if (function_exists('log_order_audit')) {
+                        log_order_audit($conn, $order_id, "Order accepted by seller", "Stock deducted atomically.", $seller_id);
+                    }
+
+                    // Notify Buyer
+                    if (function_exists('add_user_notification')) {
+                        $msg = "Your order #" . $order['order_number'] . " has been accepted by the seller!";
+                        add_user_notification($conn, $order['user_id'], 'order_update', 'Order Accepted', $msg, 'user/order_details.php?id=' . $order_id);
+                    }
+
+                    $conn->commit();
+                    $_SESSION['success'] = "Order accepted and stock updated successfully.";
+                    $order['order_status'] = 'accepted';
+                }
+            } catch (Exception $e) {
+                $conn->rollback();
+                $_SESSION['error'] = "Failed to accept order: " . $e->getMessage();
+            }
+        }
     } else {
         $new_status = '';
         switch ($action) {
-            case 'accept': $new_status = 'accepted'; break;
             case 'prepare': $new_status = 'preparing'; break;
             case 'ready': $new_status = 'ready_for_shipment'; break;
             case 'ship': $new_status = 'out_for_delivery'; break;
@@ -122,11 +220,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['workflow_action'])) {
                     if (function_exists('log_order_audit')) log_order_audit($conn, $order_id, "Seller marked delivered", "", $seller_id);
                     $order['seller_delivered'] = 1;
                 } elseif ($new_status === 'cancelled') {
-                    foreach ($order_items as $itm) {
-                        $stock_stmt = $conn->prepare("UPDATE products SET stock_quantity = stock_quantity + ?, status = IF(status='sold', 'active', status) WHERE id = ?");
-                        $stock_stmt->bind_param("ii", $itm['quantity'], $itm['product_id']);
-                        $stock_stmt->execute();
-                    }
+                    // Phase 6 Rule: Deducted stock is PERMANENT. NO automatic restoration when order is cancelled.
+                    // Seller must manually increase stock via Edit Product if they want to re-list.
                 }
                 
                 // Notify Buyer

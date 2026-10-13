@@ -10,6 +10,7 @@ $offset = ($page - 1) * $limit;
 // Filter setups
 $search = isset($_GET['q']) ? sanitize_input($_GET['q']) : '';
 $category = isset($_GET['category']) ? sanitize_input($_GET['category']) : '';
+$subcategory = isset($_GET['subcategory']) ? sanitize_input($_GET['subcategory']) : '';
 $sort = isset($_GET['sort']) ? sanitize_input($_GET['sort']) : 'newest';
 $min_price = isset($_GET['min_price']) ? (float)$_GET['min_price'] : 0;
 $max_price = isset($_GET['max_price']) ? (float)$_GET['max_price'] : 1000000;
@@ -28,13 +29,13 @@ $query = "SELECT p.*, c.name_en AS category_name, c.is_admin_only, sc.name_en AS
           LEFT JOIN categories c ON p.category_id = c.id 
           LEFT JOIN subcategories sc ON p.subcategory_id = sc.id 
           LEFT JOIN users u ON p.seller_id = u.id 
-          WHERE p.status IN ('active', 'sold') AND p.is_deleted = 0 AND p.listing_type = 'store'";
+          WHERE p.status IN ('active', 'sold', 'sold_out') AND p.is_deleted = 0 AND p.listing_type = 'store'";
 
 $count_query = "SELECT COUNT(p.id) as total FROM products p 
                 LEFT JOIN categories c ON p.category_id = c.id 
                 LEFT JOIN subcategories sc ON p.subcategory_id = sc.id 
                 LEFT JOIN users u ON p.seller_id = u.id 
-                WHERE p.status IN ('active', 'sold') AND p.is_deleted = 0 AND p.listing_type = 'store'";
+                WHERE p.status IN ('active', 'sold', 'sold_out') AND p.is_deleted = 0 AND p.listing_type = 'store'";
 
 $params = [];
 $types = "";
@@ -53,6 +54,13 @@ if ($category) {
     $query .= " AND c.slug = ?";
     $count_query .= " AND c.slug = ?";
     $params[] = $category;
+    $types .= "s";
+}
+
+if ($subcategory) {
+    $query .= " AND sc.slug = ?";
+    $count_query .= " AND sc.slug = ?";
+    $params[] = $subcategory;
     $types .= "s";
 }
 
@@ -138,11 +146,13 @@ $total_pages = ceil($total_products / $limit);
 
 // Fetch categories for sidebar
 $cat_result = $conn->query("SELECT * FROM categories WHERE status = 'active' AND is_deleted = 0 ORDER BY id ASC");
+$subcats_for_birds = $conn->query("SELECT sc.id, sc.name_en, sc.slug FROM subcategories sc JOIN categories c ON sc.category_id = c.id WHERE c.slug = 'birds-animals' AND sc.status = 'active' ORDER BY sc.id ASC");
 
 // Build query string for pagination links
 $qs_arr = [];
 if ($search) $qs_arr['q'] = $search;
 if ($category) $qs_arr['category'] = $category;
+if ($subcategory) $qs_arr['subcategory'] = $subcategory;
 if ($min_price > 0) $qs_arr['min_price'] = $min_price;
 if ($max_price < 1000000) $qs_arr['max_price'] = $max_price;
 if ($city_filter) $qs_arr['city'] = $city_filter;
@@ -204,6 +214,23 @@ include 'includes/header.php';
                                         <input class="form-check-input text-success" type="radio" name="category" id="cat_<?php echo $cat['id']; ?>" value="<?php echo $cat['slug']; ?>" <?php echo $category === $cat['slug'] ? 'checked' : ''; ?> onchange="document.getElementById('filterForm').submit()">
                                         <label class="form-check-label" for="cat_<?php echo $cat['id']; ?>"><?php echo htmlspecialchars($cat['name_en']); ?></label>
                                     </div>
+                                    <?php if ($cat['slug'] === 'birds-animals' && $category === 'birds-animals' && $subcats_for_birds && $subcats_for_birds->num_rows > 0): ?>
+                                    <div class="ms-3 ps-2 border-start mt-2 mb-2">
+                                        <div class="form-check mb-1">
+                                            <input class="form-check-input text-success" type="radio" name="subcategory" id="sub_all" value="" <?php echo empty($subcategory) ? 'checked' : ''; ?> onchange="document.getElementById('filterForm').submit()">
+                                            <label class="form-check-label small text-muted" for="sub_all">All Birds &amp; Animals</label>
+                                        </div>
+                                        <?php 
+                                        $subcats_for_birds->data_seek(0);
+                                        while($sub = $subcats_for_birds->fetch_assoc()): 
+                                        ?>
+                                        <div class="form-check mb-1">
+                                            <input class="form-check-input text-success" type="radio" name="subcategory" id="sub_<?php echo $sub['id']; ?>" value="<?php echo $sub['slug']; ?>" <?php echo $subcategory === $sub['slug'] ? 'checked' : ''; ?> onchange="document.getElementById('filterForm').submit()">
+                                            <label class="form-check-label small" for="sub_<?php echo $sub['id']; ?>"><?php echo htmlspecialchars($sub['name_en']); ?></label>
+                                        </div>
+                                        <?php endwhile; ?>
+                                    </div>
+                                    <?php endif; ?>
                                 </li>
                                 <?php endwhile; ?>
                             </ul>
@@ -289,11 +316,15 @@ include 'includes/header.php';
                         <div class="product-card h-100">
                             <div class="product-img-wrapper">
                                 <img src="<?php echo get_product_image_url($conn, $p['id']); ?>" loading="lazy" alt="<?php echo htmlspecialchars($p['title_en']); ?>">
-                                <?php if($p['is_featured']): ?>
                                 <div class="product-badges">
-                                    <span class="badge-featured">Featured</span>
+                                    <?php if ($p['status'] === 'sold_out' || $p['stock_quantity'] <= 0 || $p['status'] === 'sold'): ?>
+                                        <span class="badge bg-danger text-white rounded-pill px-2 py-1 shadow-sm">Sold Out</span>
+                                    <?php elseif (!empty($p['is_admin_product']) || (!empty($p['is_admin_only']) && $p['is_admin_only'] == 1)): ?>
+                                        <span class="badge bg-danger text-white rounded-pill px-2 py-1 shadow-sm"><i class="bi bi-star-fill me-1"></i>Special</span>
+                                    <?php elseif($p['is_featured']): ?>
+                                        <span class="badge-featured">Featured</span>
+                                    <?php endif; ?>
                                 </div>
-                                <?php endif; ?>
                                 <div class="product-actions">
                                     <form action="wishlist.php" method="POST" class="d-inline">
                                         <?php csrf_field(); ?>
@@ -318,13 +349,17 @@ include 'includes/header.php';
                                 <div class="product-price"><?php echo htmlspecialchars($site_settings['currency'] ?? 'Rs'); ?> <?php echo number_format($p['price'], 2); ?></div>
                                 <div class="product-meta mt-3">
                                     <span class="product-location"><i class="bi bi-geo-alt me-1"></i><?php echo htmlspecialchars($p['city'] ?? 'Location N/A'); ?></span>
+                                    <?php if ($p['status'] === 'sold_out' || $p['stock_quantity'] <= 0 || $p['status'] === 'sold'): ?>
+                                        <button type="button" class="btn btn-sm btn-secondary rounded-pill px-3 shadow-sm disabled" title="Sold Out" disabled><i class="bi bi-x-circle"></i></button>
+                                    <?php else: ?>
                                     <form action="cart.php" method="POST" class="d-inline">
                                         <?php csrf_field(); ?>
                                         <input type="hidden" name="action" value="add">
                                         <input type="hidden" name="product_id" value="<?php echo $p['id']; ?>">
                                         <input type="hidden" name="quantity" value="1">
-                                        <button type="submit" class="btn btn-sm btn-success rounded-pill px-3 shadow-sm"><i class="bi bi-cart-plus"></i></button>
+                                        <button type="submit" class="btn btn-sm btn-success rounded-pill px-3 shadow-sm" title="Add to Cart"><i class="bi bi-cart-plus"></i></button>
                                     </form>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>

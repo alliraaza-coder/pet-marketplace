@@ -39,16 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $upd_stmt->bind_param("i", $order_id);
         $upd_stmt->execute();
 
-        // Restore Stock
-        $items_stmt = $conn->prepare("SELECT product_id, quantity FROM order_items WHERE order_id = ?");
-        $items_stmt->bind_param("i", $order_id);
-        $items_stmt->execute();
-        $items_res = $items_stmt->get_result();
-        $stock_stmt = $conn->prepare("UPDATE products SET stock_quantity = stock_quantity + ?, status = IF(status='sold', 'active', status) WHERE id = ?");
-        while ($item = $items_res->fetch_assoc()) {
-            $stock_stmt->bind_param("ii", $item['quantity'], $item['product_id']);
-            $stock_stmt->execute();
-        }
+        // Phase 6: No automatic stock restoration on cancellation/refund.
+        // Seller must manually re-add stock via Edit Product if order is cancelled.
 
         // Record Transaction
         $amount_stmt = $conn->prepare("SELECT grand_total FROM orders WHERE id = ?");

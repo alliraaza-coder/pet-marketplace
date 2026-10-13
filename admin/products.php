@@ -199,10 +199,11 @@ $products = $stmt->get_result();
                                     $badge_class = 'bg-secondary';
                                     if ($p['status'] === 'active') $badge_class = 'bg-success';
                                     if ($p['status'] === 'pending') $badge_class = 'bg-warning text-dark';
-                                    if ($p['status'] === 'sold') $badge_class = 'bg-info text-dark';
+                                    if ($p['status'] === 'sold' || $p['status'] === 'sold_out') $badge_class = 'bg-danger text-white';
                                     if ($p['status'] === 'inactive') $badge_class = 'bg-danger';
+                                    $admin_status_label = ($p['status'] === 'sold_out') ? 'Sold Out' : ucfirst($p['status']);
                                     ?>
-                                    <span class="badge <?php echo $badge_class; ?> rounded-pill px-3 py-1"><?php echo ucfirst($p['status']); ?></span>
+                                    <span class="badge <?php echo $badge_class; ?> rounded-pill px-3 py-1"><?php echo $admin_status_label; ?></span>
                                 </td>
                                 <td><small class="text-muted"><?php echo date('d M Y', strtotime($p['created_at'])); ?></small></td>
                                 <td class="pe-4 text-end">
@@ -210,6 +211,9 @@ $products = $stmt->get_result();
                                         <button class="btn btn-sm btn-light border rounded-circle" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow">
                                             <li><a class="dropdown-item" href="product_details.php?id=<?php echo $p['id']; ?>"><i class="bi bi-eye me-2"></i> View Details</a></li>
+                                            <?php if (!empty($p['is_admin_product']) || $p['category_id'] == 5): ?>
+                                                <li><a class="dropdown-item text-warning" href="edit_market_special.php?id=<?php echo $p['id']; ?>"><i class="bi bi-pencil me-2"></i> Edit Market Special</a></li>
+                                            <?php endif; ?>
                                             <li><hr class="dropdown-divider"></li>
                                             
                                             <?php if ($p['status'] === 'pending' || $p['status'] === 'inactive' || $p['status'] === 'sold'): ?>

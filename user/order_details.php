@@ -51,11 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['buyer_action'])) {
         $upd_stmt = $conn->prepare("UPDATE orders SET order_status = 'cancelled' WHERE id = ?");
         $upd_stmt->bind_param("i", $order_id);
         if ($upd_stmt->execute()) {
-            foreach ($order_items as $itm) {
-                $stock_stmt = $conn->prepare("UPDATE products SET stock_quantity = stock_quantity + ?, status = IF(status='sold', 'active', status) WHERE id = ?");
-                $stock_stmt->bind_param("ii", $itm['quantity'], $itm['product_id']);
-                $stock_stmt->execute();
-            }
+            // Phase 6: Prior to seller acceptance, no stock was deducted, so no restoration is performed.
             $_SESSION['success'] = "Order cancelled successfully.";
             if (function_exists('log_order_audit')) log_order_audit($conn, $order_id, "Order cancelled by buyer", "", $user_id);
             $order['order_status'] = 'cancelled';

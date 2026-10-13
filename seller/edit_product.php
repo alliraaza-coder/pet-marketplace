@@ -29,7 +29,7 @@ $own_stmt->bind_param('ii', $product_id, $seller_id);
 $own_stmt->execute();
 $product = $own_stmt->get_result()->fetch_assoc();
 
-if (!$product) {
+if (!$product || !empty($product['is_admin_product'])) {
     $_SESSION['error'] = 'Product not found or you do not have permission to edit it.';
     header('Location: products.php');
     exit;
@@ -98,10 +98,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $weight         = trim($_POST['weight'] ?? '');
     $city           = trim($_POST['city'] ?? '');
     $listing_type   = ($_POST['listing_type'] ?? 'store') === 'market' ? 'market' : 'store';
-    // Seller can only mark as 'sold', cannot change back, cannot activate/deactivate
+    // Phase 6 Status Lifecycle:
+    // stock = 0 -> sold_out
+    // stock > 0 -> active (if previously sold_out or active), otherwise retain status
     $status = $product['status'];
-    if (isset($_POST['status']) && $_POST['status'] === 'sold') {
-        $status = 'sold';
+    if ($stock == 0) {
+        $status = 'sold_out';
+    } else {
+        if (in_array($status, ['sold_out', 'sold', 'active'])) {
+            $status = 'active';
+        }
+    }
+    if (isset($_POST['status']) && in_array($_POST['status'], ['sold', 'sold_out'])) {
+        $status = 'sold_out';
     }
     $is_featured    = isset($_POST['is_featured'])   ? 1 : 0;
     $is_negotiable  = isset($_POST['is_negotiable'])  ? 1 : 0;
@@ -111,6 +120,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$title_en)       $errors[] = 'Product name is required.';
     if (!$description_en) $errors[] = 'Description is required.';
     if ($price <= 0)      $errors[] = 'Price must be greater than 0.';
+
+    // Duplicate listing check for same seller
+    if ($title_en !== '') {
+        $duplicate_existing = find_seller_duplicate_product($conn, $seller_id, $title_en, $product_id);
+        if ($duplicate_existing) {
+            $errors[] = 'You already have another product listing with this name ("' . htmlspecialchars($duplicate_existing['title_en']) . '"). Please choose a unique name or update that product instead.';
+        }
+    }
+
     if (!$category_id) {
         $errors[] = 'Please select a category.';
     } else {
@@ -160,10 +178,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($errors)) {
         $conn->begin_transaction();
         try {
+            $norm_name = normalize_product_name($title_en);
             $upd = $conn->prepare(
                 "UPDATE products SET
                      category_id = ?, subcategory_id = ?,
-                     title_en = ?, description_en = ?,
+                     title_en = ?, normalized_name = ?, description_en = ?,
                      price = ?, discount_price = ?, stock_quantity = ?,
                      breed = ?, age = ?, gender = ?, color = ?, weight = ?, city = ?,
                      listing_type = ?, is_featured = ?, is_negotiable = ?,
@@ -171,9 +190,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  WHERE id = ? AND seller_id = ?"
             );
             $upd->bind_param(
-                'iissddisssssssiiiisii',
+                'iisssddisssssssiiiisii',
                 $category_id, $subcategory_id,
-                $title_en, $description_en,
+                $title_en, $norm_name, $description_en,
                 $price, $discount_price, $stock,
                 $breed, $age, $gender, $color, $weight, $city,
                 $listing_type, $is_featured, $is_negotiable,
@@ -181,6 +200,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $product_id, $seller_id
             );
             $upd->execute();
+            $upd->close();
+
+            // Sync supplemental dynamic attributes
+            if ($product['product_type'] === PRODUCT_TYPE_BIRDS_ANIMALS || empty($product['product_type'])) {
+                $dynamic_attributes = [
+                    'breed'              => $breed,
+                    'age'                => $age,
+                    'gender'             => strtolower($gender),
+                    'color'              => $color,
+                    'weight'             => $weight,
+                    'city'               => $city,
+                    'vaccinated'         => $vaccination,
+                    'health_certificate' => $health_cert
+                ];
+                save_product_dynamic_details($conn, $product_id, PRODUCT_TYPE_BIRDS_ANIMALS, $dynamic_attributes);
+            } elseif ($product['product_type'] === PRODUCT_TYPE_SEEDS_FOOD) {
+                $conn->query("UPDATE product_seeds_food SET stock_kg = $stock WHERE product_id = $product_id AND stock_type = 'numeric'");
+            } elseif ($product['product_type'] === PRODUCT_TYPE_CAGES_HOUSES) {
+                $conn->query("UPDATE product_cages_houses SET stock_pieces = $stock WHERE product_id = $product_id AND stock_type = 'numeric'");
+            }
 
             // Check if product has any primary image
             $primary_check = $conn->query(
@@ -445,17 +484,16 @@ include '../includes/header.php';
                                 <div class="mb-3">
                                     <label class="form-label fw-medium">Product Status</label>
                                     
-                                    <?php if ($product['status'] === 'sold'): ?>
+                                    <?php if ($product['status'] === 'sold_out' || $product['status'] === 'sold'): ?>
                                         <div class="alert alert-secondary py-2 mb-0">
-                                            <i class="bi bi-info-circle me-1"></i> Sold Out (Cannot be changed)
+                                            <i class="bi bi-info-circle me-1"></i> Sold Out. Set Stock Quantity &gt; 0 above to make Available.
                                         </div>
-                                        <input type="hidden" name="status" value="sold">
                                     <?php else: ?>
                                         <select name="status" class="form-select rounded-3">
                                             <option value="<?php echo $product['status']; ?>">Keep Current Status (<?php echo ucfirst($product['status']); ?>)</option>
-                                            <option value="sold">Mark as Sold Out</option>
+                                            <option value="sold_out">Mark as Sold Out</option>
                                         </select>
-                                        <div class="form-text text-muted small mt-2">You can only mark the product as Sold Out. Admin approval is required for activation.</div>
+                                        <div class="form-text text-muted small mt-2">Setting Stock Quantity to 0 will automatically set status to Sold Out. Increasing stock makes it Available.</div>
                                     <?php endif; ?>
                                     
                                 </div>

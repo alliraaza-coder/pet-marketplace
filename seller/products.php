@@ -13,7 +13,7 @@ $seller_id = (int)$_SESSION['user_id'];
 
 // ── Inputs ────────────────────────────────────────────────
 $search     = trim($_GET['q'] ?? '');
-$filter_status = in_array($_GET['status'] ?? '', ['active','pending','sold','inactive',''])
+$filter_status = in_array($_GET['status'] ?? '', ['active','pending','sold','sold_out','inactive',''])
                  ? ($_GET['status'] ?? '') : '';
 $page       = max(1, (int)($_GET['page'] ?? 1));
 $per_page   = 10;
@@ -71,7 +71,7 @@ $tab_stmt = $conn->prepare(
 $tab_stmt->bind_param('i', $seller_id);
 $tab_stmt->execute();
 $tab_result = $tab_stmt->get_result();
-$tab_counts = ['all' => 0, 'active' => 0, 'pending' => 0, 'sold' => 0, 'inactive' => 0];
+$tab_counts = ['all' => 0, 'active' => 0, 'pending' => 0, 'sold' => 0, 'sold_out' => 0, 'inactive' => 0];
 while ($t = $tab_result->fetch_assoc()) {
     $tab_counts[$t['status']] = (int)$t['cnt'];
     $tab_counts['all'] += (int)$t['cnt'];
@@ -108,7 +108,7 @@ include '../includes/header.php';
             <!-- Filter Tabs -->
             <div class="d-flex gap-2 mb-3 flex-wrap">
                 <?php
-                $tab_items = ['all'=>'All','active'=>'Active','pending'=>'Pending','sold'=>'Sold','inactive'=>'Inactive'];
+                $tab_items = ['all'=>'All','active'=>'Active','pending'=>'Pending','sold'=>'Sold','sold_out'=>'Sold Out','inactive'=>'Inactive'];
                 foreach ($tab_items as $val => $label):
                     $qs      = http_build_query(['q' => $search, 'status' => ($val === 'all' ? '' : $val)]);
                     $is_active = ($filter_status === ($val === 'all' ? '' : $val));
@@ -205,11 +205,12 @@ include '../includes/header.php';
                                     </td>
                                     <td>
                                         <?php
-                                        $badge = ['active'=>'success','pending'=>'warning','sold'=>'secondary','inactive'=>'danger'];
+                                        $badge = ['active'=>'success','pending'=>'warning','sold'=>'secondary','sold_out'=>'danger','inactive'=>'danger'];
                                         $bc    = $badge[$p['status']] ?? 'secondary';
+                                        $status_label = ($p['status'] === 'sold_out') ? 'Sold Out' : ucfirst(htmlspecialchars($p['status']));
                                         ?>
                                         <span class="badge bg-<?php echo $bc; ?> rounded-pill px-3 py-1">
-                                            <?php echo ucfirst(htmlspecialchars($p['status'])); ?>
+                                            <?php echo $status_label; ?>
                                         </span>
                                     </td>
                                     <td>

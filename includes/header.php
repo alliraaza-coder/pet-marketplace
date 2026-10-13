@@ -193,8 +193,8 @@ if (is_logged_in() && isset($conn)) {
                                 <div class="col-md-3 mb-3">
                                     <h6 class="text-success fw-bold border-bottom pb-2 mb-3"><i class="bi bi-heart"></i> Birds & Animals</h6>
                                     <ul class="list-unstyled">
-                                        <li><a class="dropdown-item text-muted mb-1 px-0" href="<?php echo BASE_URL; ?>/shop.php?category=birds-animals">Birds</a></li>
-                                        <li><a class="dropdown-item text-muted mb-1 px-0" href="<?php echo BASE_URL; ?>/shop.php?category=birds-animals">Animals</a></li>
+                                        <li><a class="dropdown-item text-muted mb-1 px-0" href="<?php echo BASE_URL; ?>/shop.php?category=birds-animals&subcategory=birds">Birds</a></li>
+                                        <li><a class="dropdown-item text-muted mb-1 px-0" href="<?php echo BASE_URL; ?>/shop.php?category=birds-animals&subcategory=animals">Animals</a></li>
                                         <li><a class="dropdown-item text-muted px-0 text-success fw-medium" href="<?php echo BASE_URL; ?>/shop.php?category=birds-animals">View Birds & Animals &rarr;</a></li>
                                     </ul>
                                 </div>

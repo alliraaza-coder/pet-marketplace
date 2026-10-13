@@ -21,7 +21,7 @@ if (!$category_id) {
 }
 
 $stmt = $conn->prepare(
-    "SELECT id, name_en FROM subcategories WHERE category_id = ? AND status = 'active' ORDER BY name_en"
+    "SELECT id, name_en, slug FROM subcategories WHERE category_id = ? AND status = 'active' ORDER BY id ASC"
 );
 $stmt->bind_param('i', $category_id);
 $stmt->execute();
@@ -29,7 +29,11 @@ $result = $stmt->get_result();
 
 $subcategories = [];
 while ($row = $result->fetch_assoc()) {
-    $subcategories[] = ['id' => $row['id'], 'name_en' => $row['name_en']];
+    $subcategories[] = [
+        'id'      => (int)$row['id'],
+        'name_en' => $row['name_en'],
+        'slug'    => $row['slug']
+    ];
 }
 
 echo json_encode($subcategories);

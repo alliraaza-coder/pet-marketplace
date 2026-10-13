@@ -5,6 +5,7 @@
  */
 require_once '../includes/config.php';
 require_once '../includes/auth.php';
+require_once '../includes/product_types.php';
 
 require_role('admin');
 
@@ -73,6 +74,9 @@ if (!$product) {
     exit;
 }
 
+$prod_type = !empty($product['product_type']) ? $product['product_type'] : get_category_product_type($conn, $product['category_id']);
+$dynamic = get_product_dynamic_details($conn, $product_id, $prod_type);
+
 $page_title = "Product Details - " . htmlspecialchars($product['title_en']);
 $page_heading = "Product Details";
 include __DIR__ . '/partials/header.php';
@@ -94,6 +98,11 @@ include __DIR__ . '/partials/header.php';
                 <input type="hidden" name="product_id" value="<?php echo $product['id']; ?>">
                 <button type="submit" class="btn btn-warning fw-bold rounded-pill px-4"><i class="bi bi-x-circle me-1"></i> Reject / Hide</button>
             </form>
+        <?php endif; ?>
+        <?php if (!empty($product['is_admin_product']) || $product['category_id'] == 5): ?>
+            <a href="edit_market_special.php?id=<?php echo $product['id']; ?>" class="btn btn-outline-warning fw-bold rounded-pill px-4 me-2">
+                <i class="bi bi-pencil me-1"></i> Edit Special
+            </a>
         <?php endif; ?>
         <form action="product_details.php" method="POST" class="d-inline ms-2">
             <input type="hidden" name="action" value="delete">
@@ -153,9 +162,11 @@ include __DIR__ . '/partials/header.php';
                         if ($product['status'] === 'active') $badge_class = 'bg-success';
                         if ($product['status'] === 'pending') $badge_class = 'bg-warning text-dark';
                         if ($product['status'] === 'sold') $badge_class = 'bg-info text-dark';
+                        if ($product['status'] === 'sold_out') $badge_class = 'bg-danger text-white';
                         if ($product['status'] === 'inactive') $badge_class = 'bg-danger';
+                        $status_label = ($product['status'] === 'sold_out') ? 'Sold Out' : ucfirst($product['status']);
                         ?>
-                        <span class="badge <?php echo $badge_class; ?> rounded-pill px-3 py-2 fs-6"><?php echo ucfirst($product['status']); ?></span>
+                        <span class="badge <?php echo $badge_class; ?> rounded-pill px-3 py-2 fs-6"><?php echo $status_label; ?></span>
                     </div>
                 </div>
 
@@ -183,6 +194,80 @@ include __DIR__ . '/partials/header.php';
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Product Type Specifications -->
+        <div class="card border-0 shadow-sm rounded-4 mb-4">
+            <div class="card-header bg-white border-0 pt-4 pb-0 px-4">
+                <h6 class="fw-bold mb-0 text-success"><i class="bi bi-card-checklist me-2"></i>Product Specifications</h6>
+            </div>
+            <div class="card-body p-4">
+                <?php if ($prod_type === PRODUCT_TYPE_BIRDS_ANIMALS): ?>
+                    <div class="row g-3">
+                        <?php if (!empty($dynamic['breed']) || !empty($product['breed'])): ?>
+                            <div class="col-sm-6"><span class="text-muted small d-block">Breed / Species:</span> <strong><?php echo htmlspecialchars($dynamic['breed'] ?? $product['breed']); ?></strong></div>
+                        <?php endif; ?>
+                        <?php if (!empty($dynamic['age']) || !empty($product['age'])): ?>
+                            <div class="col-sm-6"><span class="text-muted small d-block">Age:</span> <strong><?php echo htmlspecialchars($dynamic['age'] ?? $product['age']); ?></strong></div>
+                        <?php endif; ?>
+                        <?php $g = $dynamic['gender'] ?? $product['gender']; if (!empty($g)): ?>
+                            <div class="col-sm-6"><span class="text-muted small d-block">Gender:</span> <strong><?php echo ucfirst(htmlspecialchars($g)); ?></strong></div>
+                        <?php endif; ?>
+                        <?php if (!empty($dynamic['color']) || !empty($product['color'])): ?>
+                            <div class="col-sm-6"><span class="text-muted small d-block">Color:</span> <strong><?php echo htmlspecialchars($dynamic['color'] ?? $product['color']); ?></strong></div>
+                        <?php endif; ?>
+                        <?php if (!empty($dynamic['weight']) || !empty($product['weight'])): ?>
+                            <div class="col-sm-6"><span class="text-muted small d-block">Weight:</span> <strong><?php echo htmlspecialchars($dynamic['weight'] ?? $product['weight']); ?></strong></div>
+                        <?php endif; ?>
+                        <?php if (!empty($dynamic['city']) || !empty($product['city'])): ?>
+                            <div class="col-sm-6"><span class="text-muted small d-block">Location / City:</span> <strong><?php echo htmlspecialchars($dynamic['city'] ?? $product['city']); ?></strong></div>
+                        <?php endif; ?>
+                        <div class="col-sm-6"><span class="text-muted small d-block">Vaccinated:</span> <strong><?php echo (!empty($dynamic['vaccinated']) || !empty($product['vaccination_status'])) ? 'Yes' : 'No'; ?></strong></div>
+                        <div class="col-sm-6"><span class="text-muted small d-block">Health Certificate:</span> <strong><?php echo (!empty($dynamic['health_certificate']) || !empty($product['health_certificate'])) ? 'Yes' : 'No'; ?></strong></div>
+                    </div>
+                <?php elseif ($prod_type === PRODUCT_TYPE_SEEDS_FOOD): ?>
+                    <div class="row g-3">
+                        <div class="col-sm-6"><span class="text-muted small d-block">Price per KG:</span> <strong><?php echo $site_settings['currency'] . number_format($dynamic['price_per_kg'] ?? $product['price'], 2); ?></strong></div>
+                        <?php if (!empty($dynamic['quality'])): ?>
+                            <div class="col-sm-6"><span class="text-muted small d-block">Quality Grade:</span> <span class="badge bg-warning text-dark">Grade <?php echo htmlspecialchars($dynamic['quality']); ?></span></div>
+                        <?php endif; ?>
+                        <?php if (!empty($dynamic['discount_price_25kg']) && $dynamic['discount_price_25kg'] > 0): ?>
+                            <div class="col-sm-6"><span class="text-muted small d-block">Discount for 25 KG:</span> <strong><?php echo $site_settings['currency'] . number_format($dynamic['discount_price_25kg'], 2); ?></strong></div>
+                        <?php endif; ?>
+                        <?php if (!empty($dynamic['discount_price_50kg']) && $dynamic['discount_price_50kg'] > 0): ?>
+                            <div class="col-sm-6"><span class="text-muted small d-block">Discount for 50 KG:</span> <strong><?php echo $site_settings['currency'] . number_format($dynamic['discount_price_50kg'], 2); ?></strong></div>
+                        <?php endif; ?>
+                        <div class="col-sm-6"><span class="text-muted small d-block">Stock Mode:</span> <strong><?php echo (($dynamic['stock_type'] ?? '') === 'as_required') ? 'As Required / On Demand' : (number_format($dynamic['stock_kg'] ?? $product['stock_quantity'], 1) . ' KG'); ?></strong></div>
+                    </div>
+                <?php elseif ($prod_type === PRODUCT_TYPE_CAGES_HOUSES): ?>
+                    <div class="row g-3">
+                        <?php if (!empty($dynamic['animal_purpose'])): ?>
+                            <div class="col-sm-6"><span class="text-muted small d-block">For What Animal / Bird:</span> <strong><?php echo htmlspecialchars($dynamic['animal_purpose']); ?></strong></div>
+                        <?php endif; ?>
+                        <div class="col-sm-6"><span class="text-muted small d-block">Price per Piece:</span> <strong><?php echo $site_settings['currency'] . number_format($dynamic['price_per_piece'] ?? $product['price'], 2); ?></strong></div>
+                        <?php
+                            $dims = [];
+                            if (!empty($dynamic['length'])) $dims[] = 'L: ' . floatval($dynamic['length']) . '"';
+                            if (!empty($dynamic['width']))  $dims[] = 'W: ' . floatval($dynamic['width']) . '"';
+                            if (!empty($dynamic['depth']))  $dims[] = 'D: ' . floatval($dynamic['depth']) . '"';
+                            if (!empty($dynamic['height'])) $dims[] = 'H: ' . floatval($dynamic['height']) . '"';
+                        ?>
+                        <?php if (!empty($dims)): ?>
+                            <div class="col-sm-6"><span class="text-muted small d-block">Dimensions:</span> <strong><?php echo implode(' &times; ', $dims); ?> (<?php echo htmlspecialchars($dynamic['unit_dimension'] ?? 'inches'); ?>)</strong></div>
+                        <?php endif; ?>
+                        <?php if (!empty($dynamic['quality'])): ?>
+                            <div class="col-sm-6"><span class="text-muted small d-block">Quality Grade:</span> <span class="badge bg-warning text-dark">Grade <?php echo htmlspecialchars($dynamic['quality']); ?></span></div>
+                        <?php endif; ?>
+                        <?php if (!empty($dynamic['discount_price_12pcs']) && $dynamic['discount_price_12pcs'] > 0): ?>
+                            <div class="col-sm-6"><span class="text-muted small d-block">Discount for 12 Pieces:</span> <strong><?php echo $site_settings['currency'] . number_format($dynamic['discount_price_12pcs'], 2); ?></strong></div>
+                        <?php endif; ?>
+                        <?php if (!empty($dynamic['discount_price_24pcs']) && $dynamic['discount_price_24pcs'] > 0): ?>
+                            <div class="col-sm-6"><span class="text-muted small d-block">Discount for 24 Pieces:</span> <strong><?php echo $site_settings['currency'] . number_format($dynamic['discount_price_24pcs'], 2); ?></strong></div>
+                        <?php endif; ?>
+                        <div class="col-sm-6"><span class="text-muted small d-block">Stock Mode:</span> <strong><?php echo (($dynamic['stock_type'] ?? '') === 'as_required') ? 'As Required / On Demand' : ((int)($dynamic['stock_pieces'] ?? $product['stock_quantity']) . ' Pieces'); ?></strong></div>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
 

@@ -7,6 +7,7 @@
 
 require_once 'includes/config.php';
 require_once 'includes/auth.php';
+require_once 'includes/product_types.php';
 
 // Get product ID from query string
 $product_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -33,7 +34,7 @@ $query = "SELECT p.*,
      LEFT JOIN categories c ON p.category_id = c.id
      LEFT JOIN subcategories sc ON p.subcategory_id = sc.id
      LEFT JOIN users      u ON p.seller_id   = u.id
-     WHERE  p.status IN ('active', 'sold') AND p.is_deleted = 0 AND p.listing_type = 'store' ";
+     WHERE  p.status IN ('active', 'sold', 'sold_out') AND p.is_deleted = 0 AND p.listing_type = 'store' ";
 
 if ($product_id > 0) {
     $query .= "AND p.id = ? LIMIT 1";
@@ -65,6 +66,10 @@ $product = $result->fetch_assoc();
 
 // Use the resolved numeric ID from the DB row from now on
 $product_id = (int)$product['id'];
+
+// ── Fetch Dynamic Type Details ─────────────────────────────────────────────
+$prod_type = !empty($product['product_type']) ? $product['product_type'] : get_category_product_type($conn, $product['category_id']);
+$dynamic = get_product_dynamic_details($conn, $product_id, $prod_type);
 
 // ── Increment View Count ───────────────────────────────────────────────────
 $conn->query("UPDATE products SET views = views + 1 WHERE id = $product_id");
@@ -340,51 +345,182 @@ include 'includes/header.php';
       </div>
 
       <!-- Price -->
-      <div class="mb-3 d-flex align-items-baseline gap-2">
+      <div class="mb-2 d-flex align-items-baseline gap-2">
         <span class="fs-2 fw-bold text-success">
           <?php echo $site_settings['currency'] . number_format($product['price'], 2); ?>
         </span>
-        <?php if ($product['is_negotiable']): ?>
+        <?php if ($prod_type === PRODUCT_TYPE_SEEDS_FOOD): ?>
+          <span class="text-muted small">/ KG</span>
+        <?php elseif ($prod_type === PRODUCT_TYPE_CAGES_HOUSES): ?>
+          <span class="text-muted small">/ Piece</span>
+        <?php endif; ?>
+        <?php if (!empty($product['is_negotiable'])): ?>
           <span class="badge bg-warning text-dark rounded-pill">Price Negotiable</span>
         <?php endif; ?>
       </div>
+
+      <!-- Bulk Discounts Tier (if applicable) -->
+      <?php if ($prod_type === PRODUCT_TYPE_SEEDS_FOOD && (!empty($dynamic['discount_price_25kg']) || !empty($dynamic['discount_price_50kg']))): ?>
+      <div class="bg-light p-3 rounded-3 mb-3 border">
+        <div class="small fw-bold text-success mb-2"><i class="bi bi-tags-fill me-1"></i>Bulk Tier Discounts:</div>
+        <div class="d-flex flex-wrap gap-2 small">
+          <?php if (!empty($dynamic['discount_price_25kg']) && $dynamic['discount_price_25kg'] > 0): ?>
+            <span class="badge bg-white text-dark border p-2"><i class="bi bi-box-seam me-1 text-success"></i>25 KG Pack: <strong><?php echo $site_settings['currency'] . number_format($dynamic['discount_price_25kg'], 2); ?></strong></span>
+          <?php endif; ?>
+          <?php if (!empty($dynamic['discount_price_50kg']) && $dynamic['discount_price_50kg'] > 0): ?>
+            <span class="badge bg-white text-dark border p-2"><i class="bi bi-box-seam me-1 text-success"></i>50 KG Pack: <strong><?php echo $site_settings['currency'] . number_format($dynamic['discount_price_50kg'], 2); ?></strong></span>
+          <?php endif; ?>
+        </div>
+      </div>
+      <?php elseif ($prod_type === PRODUCT_TYPE_CAGES_HOUSES && (!empty($dynamic['discount_price_12pcs']) || !empty($dynamic['discount_price_24pcs']))): ?>
+      <div class="bg-light p-3 rounded-3 mb-3 border">
+        <div class="small fw-bold text-success mb-2"><i class="bi bi-tags-fill me-1"></i>Wholesale Discounts:</div>
+        <div class="d-flex flex-wrap gap-2 small">
+          <?php if (!empty($dynamic['discount_price_12pcs']) && $dynamic['discount_price_12pcs'] > 0): ?>
+            <span class="badge bg-white text-dark border p-2"><i class="bi bi-boxes me-1 text-success"></i>12 Pieces: <strong><?php echo $site_settings['currency'] . number_format($dynamic['discount_price_12pcs'], 2); ?></strong></span>
+          <?php endif; ?>
+          <?php if (!empty($dynamic['discount_price_24pcs']) && $dynamic['discount_price_24pcs'] > 0): ?>
+            <span class="badge bg-white text-dark border p-2"><i class="bi bi-boxes me-1 text-success"></i>24 Pieces: <strong><?php echo $site_settings['currency'] . number_format($dynamic['discount_price_24pcs'], 2); ?></strong></span>
+          <?php endif; ?>
+        </div>
+      </div>
+      <?php endif; ?>
 
       <!-- Short description -->
       <p class="text-muted lh-lg mb-4">
         <?php echo nl2br(htmlspecialchars($product['description_en'])); ?>
       </p>
 
-      <!-- Feature pills -->
+      <!-- Feature pills: Type-Specific Dynamic Attributes -->
       <div class="d-flex flex-wrap gap-2 mb-4">
-        <?php if (!empty($product['age'])): ?>
-          <span class="feature-pill"><i class="bi bi-calendar3"></i> Age: <?php echo htmlspecialchars($product['age']); ?></span>
-        <?php endif; ?>
-        <?php if ($product['gender'] && $product['gender'] !== 'Unknown'): ?>
-          <span class="feature-pill"><i class="bi bi-gender-ambiguous"></i> <?php echo htmlspecialchars($product['gender']); ?></span>
-        <?php endif; ?>
-        <?php if (!empty($product['breed'])): ?>
-          <span class="feature-pill"><i class="bi bi-award"></i> <?php echo htmlspecialchars($product['breed']); ?></span>
-        <?php endif; ?>
-        <span class="feature-pill">
-          <i class="bi bi-shield-check"></i>
-          Vaccinated: <?php echo $product['vaccination_status'] ? 'Yes' : 'No'; ?>
-        </span>
-        <?php if ($product['health_certificate']): ?>
-          <span class="feature-pill"><i class="bi bi-file-medical"></i> Health Certificate</span>
-        <?php endif; ?>
-        <?php if (!empty($product['city'])): ?>
-          <span class="feature-pill"><i class="bi bi-geo-alt"></i> <?php echo htmlspecialchars($product['city']); ?></span>
+        <?php if ($prod_type === PRODUCT_TYPE_BIRDS_ANIMALS): ?>
+          <?php $breed = $dynamic['breed'] ?? $product['breed']; ?>
+          <?php if (!empty($breed)): ?>
+            <span class="feature-pill"><i class="bi bi-award"></i> Breed: <?php echo htmlspecialchars($breed); ?></span>
+          <?php endif; ?>
+
+          <?php $age = $dynamic['age'] ?? $product['age']; ?>
+          <?php if (!empty($age)): ?>
+            <span class="feature-pill"><i class="bi bi-calendar3"></i> Age: <?php echo htmlspecialchars($age); ?></span>
+          <?php endif; ?>
+
+          <?php $gender = $dynamic['gender'] ?? $product['gender']; ?>
+          <?php if (!empty($gender) && strtolower($gender) !== 'unknown'): ?>
+            <span class="feature-pill"><i class="bi bi-gender-ambiguous"></i> Gender: <?php echo ucfirst(htmlspecialchars($gender)); ?></span>
+          <?php endif; ?>
+
+          <?php $color = $dynamic['color'] ?? $product['color']; ?>
+          <?php if (!empty($color)): ?>
+            <span class="feature-pill"><i class="bi bi-palette"></i> Color: <?php echo htmlspecialchars($color); ?></span>
+          <?php endif; ?>
+
+          <?php $weight = $dynamic['weight'] ?? $product['weight']; ?>
+          <?php if (!empty($weight)): ?>
+            <span class="feature-pill"><i class="bi bi-speedometer2"></i> Weight: <?php echo htmlspecialchars($weight); ?></span>
+          <?php endif; ?>
+
+          <?php $city = $dynamic['city'] ?? $product['city']; ?>
+          <?php if (!empty($city)): ?>
+            <span class="feature-pill"><i class="bi bi-geo-alt"></i> Location: <?php echo htmlspecialchars($city); ?></span>
+          <?php endif; ?>
+
+          <?php $is_vax = isset($dynamic['vaccinated']) ? $dynamic['vaccinated'] : ($product['vaccination_status'] ?? 0); ?>
+          <span class="feature-pill"><i class="bi bi-shield-check"></i> Vaccinated: <?php echo $is_vax ? 'Yes' : 'No'; ?></span>
+
+          <?php $has_cert = isset($dynamic['health_certificate']) ? $dynamic['health_certificate'] : ($product['health_certificate'] ?? 0); ?>
+          <?php if ($has_cert): ?>
+            <span class="feature-pill"><i class="bi bi-file-medical"></i> Health Certificate</span>
+          <?php endif; ?>
+
+        <?php elseif ($prod_type === PRODUCT_TYPE_SEEDS_FOOD): ?>
+          <?php if (!empty($dynamic['price_per_kg']) && $dynamic['price_per_kg'] > 0): ?>
+            <span class="feature-pill"><i class="bi bi-cash-stack"></i> Price/KG: <?php echo $site_settings['currency'] . number_format($dynamic['price_per_kg'], 2); ?></span>
+          <?php endif; ?>
+
+          <?php if (!empty($dynamic['quality'])): ?>
+            <span class="feature-pill"><i class="bi bi-star-fill text-warning"></i> Quality: Grade <?php echo htmlspecialchars($dynamic['quality']); ?></span>
+          <?php endif; ?>
+
+          <?php if (!empty($dynamic['stock_type']) && $dynamic['stock_type'] === 'as_required'): ?>
+            <span class="feature-pill"><i class="bi bi-infinity"></i> Stock: On Demand / As Required</span>
+          <?php elseif (isset($dynamic['stock_kg']) && $dynamic['stock_kg'] > 0): ?>
+            <span class="feature-pill"><i class="bi bi-box-seam"></i> Stock: <?php echo number_format($dynamic['stock_kg'], 1); ?> KG</span>
+          <?php endif; ?>
+
+          <?php $city = $dynamic['city'] ?? $product['city']; ?>
+          <?php if (!empty($city)): ?>
+            <span class="feature-pill"><i class="bi bi-geo-alt"></i> Location: <?php echo htmlspecialchars($city); ?></span>
+          <?php endif; ?>
+
+        <?php elseif ($prod_type === PRODUCT_TYPE_CAGES_HOUSES): ?>
+          <?php if (!empty($dynamic['animal_purpose'])): ?>
+            <span class="feature-pill"><i class="bi bi-heart"></i> For: <?php echo htmlspecialchars($dynamic['animal_purpose']); ?></span>
+          <?php endif; ?>
+
+          <?php
+            $dim_parts = [];
+            if (!empty($dynamic['length'])) $dim_parts[] = 'L: ' . floatval($dynamic['length']) . '"';
+            if (!empty($dynamic['width']))  $dim_parts[] = 'W: ' . floatval($dynamic['width']) . '"';
+            if (!empty($dynamic['depth']))  $dim_parts[] = 'D: ' . floatval($dynamic['depth']) . '"';
+            if (!empty($dynamic['height'])) $dim_parts[] = 'H: ' . floatval($dynamic['height']) . '"';
+          ?>
+          <?php if (!empty($dim_parts)): ?>
+            <span class="feature-pill"><i class="bi bi-aspect-ratio"></i> Dimensions: <?php echo implode(' &times; ', $dim_parts); ?></span>
+          <?php endif; ?>
+
+          <?php if (!empty($dynamic['price_per_piece']) && $dynamic['price_per_piece'] > 0): ?>
+            <span class="feature-pill"><i class="bi bi-cash-stack"></i> Price/Piece: <?php echo $site_settings['currency'] . number_format($dynamic['price_per_piece'], 2); ?></span>
+          <?php endif; ?>
+
+          <?php if (!empty($dynamic['quality'])): ?>
+            <span class="feature-pill"><i class="bi bi-star-fill text-warning"></i> Quality: Grade <?php echo htmlspecialchars($dynamic['quality']); ?></span>
+          <?php endif; ?>
+
+          <?php if (!empty($dynamic['stock_type']) && $dynamic['stock_type'] === 'as_required'): ?>
+            <span class="feature-pill"><i class="bi bi-infinity"></i> Stock: On Demand / As Required</span>
+          <?php elseif (isset($dynamic['stock_pieces']) && $dynamic['stock_pieces'] > 0): ?>
+            <span class="feature-pill"><i class="bi bi-box-seam"></i> Stock: <?php echo (int)$dynamic['stock_pieces']; ?> Pieces</span>
+          <?php endif; ?>
+
+          <?php $city = $dynamic['city'] ?? $product['city']; ?>
+          <?php if (!empty($city)): ?>
+            <span class="feature-pill"><i class="bi bi-geo-alt"></i> Location: <?php echo htmlspecialchars($city); ?></span>
+          <?php endif; ?>
         <?php endif; ?>
       </div>
 
-      <!-- Stock -->
-      <p class="text-muted small mb-4">
-        <i class="bi bi-box-seam me-1 text-success"></i>
-        <strong><?php echo (int)$product['stock_quantity']; ?></strong> available in stock
-      </p>
+      <!-- Stock Status -->
+      <?php if ((int)$product['stock_quantity'] <= 0 || in_array($product['status'], ['sold', 'sold_out'])): ?>
+        <p class="text-danger small mb-4 fw-bold">
+          <i class="bi bi-x-circle me-1"></i><strong>Sold Out</strong> (0 available in stock)
+        </p>
+      <?php elseif ($prod_type === PRODUCT_TYPE_SEEDS_FOOD && ($dynamic['stock_type'] ?? '') === 'as_required'): ?>
+        <p class="text-success small mb-4">
+          <i class="bi bi-infinity me-1"></i><strong>Available on Demand</strong> (Stock supplied as required)
+        </p>
+      <?php elseif ($prod_type === PRODUCT_TYPE_CAGES_HOUSES && ($dynamic['stock_type'] ?? '') === 'as_required'): ?>
+        <p class="text-success small mb-4">
+          <i class="bi bi-infinity me-1"></i><strong>Available on Demand</strong> (Stock supplied as required)
+        </p>
+      <?php elseif ($prod_type === PRODUCT_TYPE_SEEDS_FOOD && !empty($dynamic['stock_kg'])): ?>
+        <p class="text-muted small mb-4">
+          <i class="bi bi-box-seam me-1 text-success"></i>
+          <strong><?php echo number_format($dynamic['stock_kg'], 1); ?> KG</strong> available in stock
+        </p>
+      <?php elseif ($prod_type === PRODUCT_TYPE_CAGES_HOUSES && !empty($dynamic['stock_pieces'])): ?>
+        <p class="text-muted small mb-4">
+          <i class="bi bi-box-seam me-1 text-success"></i>
+          <strong><?php echo (int)$dynamic['stock_pieces']; ?> Pieces</strong> available in stock
+        </p>
+      <?php else: ?>
+        <p class="text-muted small mb-4">
+          <i class="bi bi-box-seam me-1 text-success"></i>
+          <strong><?php echo (int)$product['stock_quantity']; ?></strong> available in stock
+        </p>
+      <?php endif; ?>
 
       <!-- ── Add to Cart form ────────────────────────────────────────── -->
-      <?php if ((int)$product['stock_quantity'] > 0 && $product['status'] !== 'sold'): ?>
+      <?php if ((int)$product['stock_quantity'] > 0 && !in_array($product['status'], ['sold', 'sold_out'])): ?>
       <form action="cart.php" method="POST" class="mb-3">
         <input type="hidden" name="action"     value="add">
         <input type="hidden" name="product_id" value="<?php echo $product_id; ?>">
@@ -408,7 +544,7 @@ include 'includes/header.php';
       </form>
       
       <!-- Direct Buy / Send Buy Request -->
-      <?php if ((int)$product['stock_quantity'] > 0 && $product['status'] !== 'sold'): ?>
+      <?php if ((int)$product['stock_quantity'] > 0 && !in_array($product['status'], ['sold', 'sold_out'])): ?>
       <form action="cart.php" method="POST" class="mb-3" id="buyNowForm">
         <input type="hidden" name="action" value="add">
         <input type="hidden" name="product_id" value="<?php echo $product_id; ?>">
@@ -425,7 +561,7 @@ include 'includes/header.php';
       <?php endif; ?>
       <?php else: ?>
       <div class="alert alert-danger d-inline-block px-4 rounded-pill mb-4 fw-bold">
-        <i class="bi bi-x-circle me-1"></i> Out of Stock
+        <i class="bi bi-x-circle me-1"></i> Sold Out
       </div>
       <?php endif; ?>
 
