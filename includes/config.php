@@ -220,5 +220,3 @@ function add_user_notification($conn, $user_id, $type, $title, $message, $link =
  * Dynamic Product Types Helpers (Phase 2)
  */
 require_once __DIR__ . '/product_types.php';
-?>
-

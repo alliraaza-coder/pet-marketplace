@@ -4,6 +4,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/auth.php';
 
 // Calculate dynamic badge counts
+$current_lang = $current_lang ?? ($_SESSION['lang'] ?? 'en');
 $cart_count = isset($_SESSION['cart']) ? count($_SESSION['cart']) : 0;
 $wishlist_count = 0;
 
