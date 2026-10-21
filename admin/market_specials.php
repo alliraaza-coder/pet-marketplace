@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $upd = $conn->prepare("UPDATE products SET is_deleted = 1, deleted_at = NOW() WHERE id = ?");
         $upd->bind_param("i", $product_id);
         if ($upd->execute()) {
-            log_admin_activity($conn, $admin_id, "Deleted Market Special", "Soft deleted Market Special ID: $product_id");
+            log_admin_activity($conn, $admin_id, "Deleted Market Special", "Deleted Market Special ID: $product_id");
             $_SESSION['success'] = "Market Special product deleted successfully.";
         }
     } elseif ($action === 'update_stock') {

@@ -37,7 +37,7 @@ if (!$product) {
     exit;
 }
 
-// ── Soft delete from database ──
+// ── Delete from database ──
 $del = $conn->prepare("UPDATE products SET is_deleted = 1, deleted_at = NOW() WHERE id = ? AND seller_id = ?");
 $del->bind_param('ii', $product_id, $seller_id);
 $del->execute();

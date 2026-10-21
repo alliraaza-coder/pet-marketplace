@@ -9,7 +9,7 @@ include __DIR__ . '/partials/header.php';
 
 $admin_id = $_SESSION['user_id'];
 
-// Handle Actions (Verify, Unverify, Activate, Suspend, Soft Delete)
+// Handle Actions (Verify, Unverify, Activate, Suspend, Delete)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['seller_id'])) {
     $action    = sanitize_input($_POST['action']);
     $seller_id = (int)$_POST['seller_id'];
@@ -46,8 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['sel
         $stmt = $conn->prepare("UPDATE users SET is_deleted = 1, deleted_at = NOW() WHERE id = ? AND role = 'seller'");
         $stmt->bind_param("i", $seller_id);
         if ($stmt->execute()) {
-            log_admin_activity($conn, $admin_id, "Soft Deleted Seller", "Soft deleted Seller ID: $seller_id");
-            $_SESSION['success'] = "Seller soft deleted successfully.";
+            log_admin_activity($conn, $admin_id, "Deleted Seller", "Deleted Seller ID: $seller_id");
+            $_SESSION['success'] = "Seller deleted successfully.";
         }
     }
     header('Location: sellers.php');
@@ -225,7 +225,7 @@ $sellers = $stmt->get_result();
                                                 <form action="sellers.php" method="POST" class="d-inline">
                                                     <input type="hidden" name="action" value="delete">
                                                     <input type="hidden" name="seller_id" value="<?php echo $s['id']; ?>">
-                                                    <button type="submit" class="dropdown-item text-danger" onclick="return confirm('Soft delete this seller?');"><i class="bi bi-trash me-2"></i> Soft Delete</button>
+                                                    <button type="submit" class="dropdown-item text-danger" onclick="return confirm('Are you sure you want to delete this seller?');"><i class="bi bi-trash me-2"></i> Delete</button>
                                                 </form>
                                             </li>
                                         </ul>

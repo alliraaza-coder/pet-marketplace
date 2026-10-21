@@ -44,8 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['pro
         $stmt = $conn->prepare("UPDATE products SET is_deleted = 1, deleted_at = NOW() WHERE id = ?");
         $stmt->bind_param("i", $product_id);
         if ($stmt->execute()) {
-            log_admin_activity($conn, $admin_id, "Soft Deleted Product", "Soft deleted Product ID: $product_id");
-            $_SESSION['success'] = "Product soft deleted successfully.";
+            log_admin_activity($conn, $admin_id, "Deleted Product", "Deleted Product ID: $product_id");
+            $_SESSION['success'] = "Product deleted successfully.";
             header('Location: products.php');
             exit;
         }
@@ -107,7 +107,7 @@ include __DIR__ . '/partials/header.php';
         <form action="product_details.php" method="POST" class="d-inline ms-2">
             <input type="hidden" name="action" value="delete">
             <input type="hidden" name="product_id" value="<?php echo $product['id']; ?>">
-            <button type="submit" class="btn btn-outline-danger fw-bold rounded-pill px-4" onclick="return confirm('Soft delete this product?');"><i class="bi bi-trash me-1"></i> Delete</button>
+            <button type="submit" class="btn btn-outline-danger fw-bold rounded-pill px-4" onclick="return confirm('Are you sure you want to delete this product?');"><i class="bi bi-trash me-1"></i> Delete</button>
         </form>
     </div>
 </div>

@@ -12,7 +12,7 @@ $page_heading = "Manage Categories";
 
 $admin_id = $_SESSION['user_id'];
 
-// Handle Actions (Add, Edit, Enable, Disable, Soft Delete) — BEFORE header include
+// Handle Actions (Add, Edit, Enable, Disable, Delete) — BEFORE header include
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     verify_csrf();
     $action = sanitize_input($_POST['action']);
