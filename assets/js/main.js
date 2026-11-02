@@ -86,3 +86,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+
+/* ============================================================
+   Show / Hide Password Toggle
+   Used on: login.php, register.php, seller_register.php,
+            admin/login.php, admin/change_password.php,
+            admin/profile.php
+   ============================================================ */
+function togglePassword(fieldId, btn) {
+    var field = document.getElementById(fieldId);
+    if (!field) return;
+    var icon = btn.querySelector('i');
+    if (field.type === 'password') {
+        field.type = 'text';
+        if (icon) { icon.classList.remove('bi-eye'); icon.classList.add('bi-eye-slash'); }
+        btn.title = 'Hide Password';
+    } else {
+        field.type = 'password';
+        if (icon) { icon.classList.remove('bi-eye-slash'); icon.classList.add('bi-eye'); }
+        btn.title = 'Show Password';
+    }
+}

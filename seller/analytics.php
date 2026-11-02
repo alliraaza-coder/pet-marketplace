@@ -14,13 +14,13 @@ $seller_id = (int)$_SESSION['user_id'];
 // ── Summary stats ─────────────────────────────────────────────
 $summary_stmt = $conn->prepare(
     "SELECT
-        COALESCE(SUM(oi.total), 0)         AS total_earnings,
-        COALESCE(SUM(oi.quantity), 0)      AS total_units_sold,
-        COUNT(DISTINCT o.id)               AS total_orders,
-        COALESCE(AVG(oi.total), 0)         AS avg_order_value
+        COALESCE(SUM(CASE WHEN o.order_status != 'cancelled' THEN oi.total ELSE 0 END), 0)         AS total_earnings,
+        COALESCE(SUM(CASE WHEN o.order_status != 'cancelled' THEN oi.quantity ELSE 0 END), 0)      AS total_units_sold,
+        COUNT(DISTINCT CASE WHEN o.order_status != 'cancelled' THEN o.id END)                      AS total_orders,
+        COALESCE(AVG(CASE WHEN o.order_status != 'cancelled' THEN oi.total ELSE NULL END), 0)      AS avg_order_value
      FROM order_items oi
      JOIN orders o ON oi.order_id = o.id
-     WHERE oi.seller_id = ?"
+     WHERE oi.seller_id = ? AND o.payment_status NOT IN ('pending', 'payment_submitted', 'rejected')"
 );
 $summary_stmt->bind_param('i', $seller_id);
 $summary_stmt->execute();
@@ -32,6 +32,8 @@ $month_stmt = $conn->prepare(
      FROM order_items oi
      JOIN orders o ON oi.order_id = o.id
      WHERE oi.seller_id = ?
+       AND o.order_status != 'cancelled'
+       AND o.payment_status NOT IN ('pending', 'payment_submitted', 'rejected')
        AND MONTH(o.created_at) = MONTH(NOW())
        AND YEAR(o.created_at)  = YEAR(NOW())"
 );
@@ -48,6 +50,8 @@ $chart_stmt = $conn->prepare(
      FROM order_items oi
      JOIN orders o ON oi.order_id = o.id
      WHERE oi.seller_id = ?
+       AND o.order_status != 'cancelled'
+       AND o.payment_status NOT IN ('pending', 'payment_submitted', 'rejected')
        AND o.created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
      GROUP BY month_key, month_label
      ORDER BY month_key ASC"
@@ -87,7 +91,10 @@ $top_stmt = $conn->prepare(
              WHERE pi.product_id = p.id AND pi.is_primary = 1 LIMIT 1) AS thumb
      FROM order_items oi
      JOIN products p ON oi.product_id = p.id
+     JOIN orders o ON oi.order_id = o.id
      WHERE oi.seller_id = ?
+       AND o.order_status != 'cancelled'
+       AND o.payment_status NOT IN ('pending', 'payment_submitted', 'rejected')
      GROUP BY p.id
      ORDER BY revenue DESC
      LIMIT 8"

@@ -130,15 +130,24 @@ include __DIR__ . '/partials/header.php';
                     <input type="hidden" name="action" value="update_password">
                     <div class="mb-3">
                         <label class="form-label fw-bold">Current Password</label>
-                        <input type="password" name="current_password" class="form-control bg-light border-0" required>
+                        <div class="input-group">
+                            <input type="password" id="prof_current" name="current_password" class="form-control bg-light border-0" required>
+                            <button type="button" class="btn btn-outline-secondary border-start-0 px-3" style="cursor:pointer" onclick="togglePassword('prof_current', this)" title="Show/Hide Password"><i class="bi bi-eye"></i></button>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">New Password</label>
-                        <input type="password" name="new_password" class="form-control bg-light border-0" minlength="6" required>
+                        <div class="input-group">
+                            <input type="password" id="prof_new" name="new_password" class="form-control bg-light border-0" minlength="6" required>
+                            <button type="button" class="btn btn-outline-secondary border-start-0 px-3" style="cursor:pointer" onclick="togglePassword('prof_new', this)" title="Show/Hide Password"><i class="bi bi-eye"></i></button>
+                        </div>
                     </div>
                     <div class="mb-4">
                         <label class="form-label fw-bold">Confirm New Password</label>
-                        <input type="password" name="confirm_password" class="form-control bg-light border-0" minlength="6" required>
+                        <div class="input-group">
+                            <input type="password" id="prof_confirm" name="confirm_password" class="form-control bg-light border-0" minlength="6" required>
+                            <button type="button" class="btn btn-outline-secondary border-start-0 px-3" style="cursor:pointer" onclick="togglePassword('prof_confirm', this)" title="Show/Hide Password"><i class="bi bi-eye"></i></button>
+                        </div>
                     </div>
                     <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold">Update Password</button>
                 </form>

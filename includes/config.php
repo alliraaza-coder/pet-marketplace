@@ -102,10 +102,13 @@ function log_admin_activity($conn, $admin_id, $action, $details = '') {
 }
 
 /**
- * Helper function to sanitize user input to prevent XSS
+ * Helper function to sanitize user input.
+ * NOTE: This MUST NOT apply htmlspecialchars() here — data is stored raw in the DB.
+ * HTML encoding is applied at output time by htmlspecialchars() in every template.
+ * Encoding before DB storage causes double-encoding (&amp; shows as &amp;amp; on screen).
  */
 function sanitize_input($data) {
-    return htmlspecialchars(stripslashes(trim($data)));
+    return trim(stripslashes($data));
 }
 
 /**
@@ -214,6 +217,22 @@ function add_user_notification($conn, $user_id, $type, $title, $message, $link =
         return $result;
     }
     return false;
+}
+
+/**
+ * Retrieve user payment account details
+ */
+function get_user_payment_account($conn, $user_id) {
+    if (!$user_id) return null;
+    $stmt = $conn->prepare("SELECT * FROM user_payment_accounts WHERE user_id = ? LIMIT 1");
+    if ($stmt) {
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $res = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return $res ?: null;
+    }
+    return null;
 }
 
 /**

@@ -50,6 +50,8 @@ while ($row = $sub_res->fetch_assoc()) {
 }
 assert_test("Subcategories under Birds & Animals include 'birds'", in_array('birds', $sub_slugs));
 assert_test("Subcategories under Birds & Animals include 'animals'", in_array('animals', $sub_slugs));
+assert_test("Subcategories under Birds & Animals do NOT include 'parrots'", !in_array('parrots', $sub_slugs));
+assert_test("Subcategories under Birds & Animals do NOT include 'cats'", !in_array('cats', $sub_slugs));
 
 // 1.3: Seller categories query strictly excludes Market Specials
 $seller_cats = $conn->query("SELECT slug FROM categories WHERE status = 'active' AND is_admin_only = 0 AND is_deleted = 0");

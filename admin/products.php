@@ -98,7 +98,8 @@ $total_products = $cnt_stmt->get_result()->fetch_assoc()['total'];
 $total_pages    = max(1, ceil($total_products / $per_page));
 
 // Fetch products
-$sql = "SELECT p.id, p.title_en, p.price, p.stock_quantity, p.status, p.is_featured, p.created_at, 
+$sql = "SELECT p.id, p.title_en, p.price, p.stock_quantity, p.status, p.is_featured,
+        p.category_id, p.is_admin_product, p.created_at,
         u.first_name, u.last_name, c.name_en AS category_name
         FROM products p 
         JOIN users u ON p.seller_id = u.id 

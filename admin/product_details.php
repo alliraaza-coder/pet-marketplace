@@ -151,7 +151,7 @@ include __DIR__ . '/partials/header.php';
                         <?php endif; ?>
                         
                         <h2 class="fw-bold mb-1"><?php echo htmlspecialchars($product['title_en']); ?></h2>
-                        <?php if ($product['title_ar']): ?>
+                        <?php if (!empty($product['title_ar'] ?? null)): ?>
                             <h4 class="text-muted mb-3" dir="rtl"><?php echo htmlspecialchars($product['title_ar']); ?></h4>
                         <?php endif; ?>
                     </div>
@@ -175,7 +175,7 @@ include __DIR__ . '/partials/header.php';
                 <h6 class="fw-bold mb-3">Description (English)</h6>
                 <p class="text-muted mb-4" style="white-space: pre-line;"><?php echo htmlspecialchars($product['description_en']); ?></p>
 
-                <?php if ($product['description_ar']): ?>
+                <?php if (!empty($product['description_ar'] ?? null)): ?>
                     <h6 class="fw-bold mb-3">Description (Arabic)</h6>
                     <p class="text-muted mb-4" dir="rtl" style="white-space: pre-line;"><?php echo htmlspecialchars($product['description_ar']); ?></p>
                 <?php endif; ?>

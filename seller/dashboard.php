@@ -29,11 +29,13 @@ $prod_counts = $prod_stmt->get_result()->fetch_assoc();
 $order_stmt = $conn->prepare(
     "SELECT
         COUNT(DISTINCT o.id) AS total_orders,
-        SUM(CASE WHEN o.order_status = 'completed' THEN 1 ELSE 0 END) AS completed_orders,
-        COALESCE(SUM(oi.quantity), 0) AS products_sold,
-        COALESCE(SUM(CASE WHEN o.payment_status NOT IN ('pending','payment_submitted','rejected','refund_sent','refund_received') THEN oi.total ELSE 0 END), 0) AS total_sales,
-        COALESCE(SUM(CASE WHEN o.payment_status IN ('seller_payment_sent','seller_payment_received') THEN o.seller_payment_amount ELSE 0 END), 0) AS payments_received,
-        COALESCE(SUM(CASE WHEN o.payment_status = 'held' AND o.seller_payment_sent_at IS NULL THEN oi.total ELSE 0 END), 0) AS pending_seller_payments
+        COUNT(DISTINCT CASE WHEN o.order_status = 'completed' THEN o.id END) AS completed_orders,
+        COUNT(DISTINCT CASE WHEN o.order_status NOT IN ('completed', 'cancelled') THEN o.id END) AS pending_orders,
+        COUNT(DISTINCT CASE WHEN o.order_status = 'cancelled' THEN o.id END) AS cancelled_orders,
+        COALESCE(SUM(CASE WHEN o.order_status != 'cancelled' THEN oi.quantity ELSE 0 END), 0) AS products_sold,
+        COALESCE(SUM(CASE WHEN o.payment_status NOT IN ('pending','payment_submitted','rejected','refund_sent','refund_received') AND o.order_status != 'cancelled' THEN oi.total ELSE 0 END), 0) AS total_sales,
+        COALESCE(SUM(CASE WHEN o.payment_status IN ('seller_payment_sent','seller_payment_received') AND o.order_status != 'cancelled' THEN oi.total ELSE 0 END), 0) AS payments_received,
+        COALESCE(SUM(CASE WHEN o.payment_status = 'held' AND o.seller_payment_sent_at IS NULL AND o.order_status != 'cancelled' THEN oi.total ELSE 0 END), 0) AS pending_seller_payments
      FROM order_items oi
      JOIN orders o ON oi.order_id = o.id
      WHERE oi.seller_id = ? AND o.payment_status NOT IN ('pending', 'payment_submitted', 'rejected')"
@@ -127,8 +129,21 @@ function status_badge($status) {
                 </a>
             </div>
 
-            <!-- ── Stat Cards ─────────────────────────────────── -->
-            <div class="row g-3 mb-4">
+            <!-- â”€â”€ Products & Orders Overview Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+            <?php if ((int)$prod_counts['pending'] > 0): ?>
+            <div class="alert alert-warning border-0 rounded-4 shadow-sm mb-4 d-flex align-items-center justify-content-between p-3">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-hourglass-split fs-4 me-3 text-warning"></i>
+                    <div>
+                        <strong class="d-block">Product Approval Notice</strong>
+                        <span class="small text-muted">You have <strong><?php echo (int)$prod_counts['pending']; ?></strong> product(s) pending approval from admin.</span>
+                    </div>
+                </div>
+                <a href="products.php?status=pending" class="btn btn-sm btn-warning rounded-pill fw-bold px-3">View Products</a>
+            </div>
+            <?php endif; ?>
+
+            <div class="row g-3 mb-3">
                 <!-- Total Products -->
                 <div class="col-6 col-md-4 col-xl-2">
                     <div class="card border-0 shadow-sm rounded-4 h-100 stat-card">
@@ -141,7 +156,7 @@ function status_badge($status) {
                         </div>
                     </div>
                 </div>
-                <!-- Active -->
+                <!-- Active Products -->
                 <div class="col-6 col-md-4 col-xl-2">
                     <div class="card border-0 shadow-sm rounded-4 h-100 stat-card">
                         <div class="card-body p-3 text-center">
@@ -149,19 +164,7 @@ function status_badge($status) {
                                 <i class="bi bi-check-circle fs-4"></i>
                             </div>
                             <h3 class="fw-bold mb-0 text-success"><?php echo (int)$prod_counts['active']; ?></h3>
-                            <p class="text-muted small mb-0">Active</p>
-                        </div>
-                    </div>
-                </div>
-                <!-- Pending -->
-                <div class="col-6 col-md-4 col-xl-2">
-                    <div class="card border-0 shadow-sm rounded-4 h-100 stat-card">
-                        <div class="card-body p-3 text-center">
-                            <div class="stat-icon bg-warning bg-opacity-10 text-warning rounded-circle mx-auto mb-2">
-                                <i class="bi bi-hourglass-split fs-4"></i>
-                            </div>
-                            <h3 class="fw-bold mb-0 text-warning"><?php echo (int)$prod_counts['pending']; ?></h3>
-                            <p class="text-muted small mb-0">Pending</p>
+                            <p class="text-muted small mb-0">Active Products</p>
                         </div>
                     </div>
                 </div>
@@ -169,10 +172,10 @@ function status_badge($status) {
                 <div class="col-6 col-md-4 col-xl-2">
                     <div class="card border-0 shadow-sm rounded-4 h-100 stat-card">
                         <div class="card-body p-3 text-center">
-                            <div class="stat-icon bg-secondary bg-opacity-10 text-secondary rounded-circle mx-auto mb-2">
+                            <div class="stat-icon bg-info bg-opacity-10 text-info rounded-circle mx-auto mb-2">
                                 <i class="bi bi-bag-check fs-4"></i>
                             </div>
-                            <h3 class="fw-bold mb-0 text-secondary"><?php echo (int)$order_stats['products_sold']; ?></h3>
+                            <h3 class="fw-bold mb-0 text-info"><?php echo (int)$order_stats['products_sold']; ?></h3>
                             <p class="text-muted small mb-0">Products Sold</p>
                         </div>
                     </div>
@@ -181,22 +184,50 @@ function status_badge($status) {
                 <div class="col-6 col-md-4 col-xl-2">
                     <div class="card border-0 shadow-sm rounded-4 h-100 stat-card">
                         <div class="card-body p-3 text-center">
-                            <div class="stat-icon bg-info bg-opacity-10 text-info rounded-circle mx-auto mb-2">
+                            <div class="stat-icon bg-success bg-opacity-10 text-success rounded-circle mx-auto mb-2">
                                 <i class="bi bi-receipt fs-4"></i>
                             </div>
-                            <h3 class="fw-bold mb-0 text-info"><?php echo (int)$order_stats['completed_orders']; ?></h3>
+                            <h3 class="fw-bold mb-0 text-success"><?php echo (int)$order_stats['completed_orders']; ?></h3>
                             <p class="text-muted small mb-0">Completed Orders</p>
                         </div>
                     </div>
                 </div>
-                <!-- Total Sales -->
+                <!-- Pending Orders -->
                 <div class="col-6 col-md-4 col-xl-2">
                     <div class="card border-0 shadow-sm rounded-4 h-100 stat-card">
                         <div class="card-body p-3 text-center">
-                            <div class="stat-icon bg-secondary bg-opacity-10 text-secondary rounded-circle mx-auto mb-2">
+                            <div class="stat-icon bg-warning bg-opacity-10 text-warning rounded-circle mx-auto mb-2">
+                                <i class="bi bi-hourglass-split fs-4"></i>
+                            </div>
+                            <h3 class="fw-bold mb-0 text-warning"><?php echo (int)$order_stats['pending_orders']; ?></h3>
+                            <p class="text-muted small mb-0">Pending Orders</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- Cancelled Orders -->
+                <div class="col-6 col-md-4 col-xl-2">
+                    <div class="card border-0 shadow-sm rounded-4 h-100 stat-card">
+                        <div class="card-body p-3 text-center">
+                            <div class="stat-icon bg-danger bg-opacity-10 text-danger rounded-circle mx-auto mb-2">
+                                <i class="bi bi-x-circle fs-4"></i>
+                            </div>
+                            <h3 class="fw-bold mb-0 text-danger"><?php echo (int)$order_stats['cancelled_orders']; ?></h3>
+                            <p class="text-muted small mb-0">Cancelled Orders</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- â”€â”€ Financial Summary Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+            <div class="row g-3 mb-4">
+                <!-- Total Sales -->
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-sm rounded-4 h-100 stat-card bg-white">
+                        <div class="card-body p-3 text-center">
+                            <div class="stat-icon bg-primary bg-opacity-10 text-primary rounded-circle mx-auto mb-2">
                                 <i class="bi bi-currency-dollar fs-4"></i>
                             </div>
-                            <h3 class="fw-bold mb-0">
+                            <h3 class="fw-bold mb-0 text-primary">
                                 <?php echo $site_settings['currency'] . number_format($order_stats['total_sales'], 0); ?>
                             </h3>
                             <p class="text-muted small mb-0">Total Sales</p>
@@ -205,7 +236,7 @@ function status_badge($status) {
                 </div>
                 
                 <!-- Pending Seller Payments -->
-                <div class="col-6 col-md-4 col-xl-2">
+                <div class="col-6 col-md-4">
                     <div class="card border-0 shadow-sm rounded-4 h-100 bg-warning text-dark stat-card">
                         <div class="card-body p-3 text-center">
                             <div class="stat-icon bg-white bg-opacity-25 rounded-circle mx-auto mb-2">
@@ -220,7 +251,7 @@ function status_badge($status) {
                 </div>
 
                 <!-- Payments Received -->
-                <div class="col-6 col-md-4 col-xl-2">
+                <div class="col-6 col-md-4">
                     <div class="card border-0 shadow-sm rounded-4 h-100 bg-success text-white stat-card">
                         <div class="card-body p-3 text-center">
                             <div class="stat-icon bg-white bg-opacity-25 rounded-circle mx-auto mb-2">
@@ -234,7 +265,6 @@ function status_badge($status) {
                     </div>
                 </div>
             </div>
-
             <!-- ── Bottom Row: Recent Orders + Recent Products ─── -->
             <div class="row g-4">
 

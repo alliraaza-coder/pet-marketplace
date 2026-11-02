@@ -249,10 +249,18 @@ include 'includes/header.php';
                                 <h6 class="fw-bold text-success mb-2">Direct Bank Transfer Details</h6>
                                 <p class="small text-muted mb-0">
                                     Please transfer the total amount to the following bank account:<br>
-                                    <strong>Bank Name:</strong> Allied Bank Limited (ABL)<br>
-                                    <strong>Account Title:</strong> Pet Marketplace Ltd.<br>
-                                    <strong>Account Number:</strong> 1234-5678-9012-34<br>
-                                    <strong>IBAN:</strong> PK12 ABIL 0010 0987 6543 2100<br>
+                                    <?php if (!empty($site_settings['pay_bank_name'])): ?>
+                                    <strong>Bank Name:</strong> <?php echo htmlspecialchars($site_settings['pay_bank_name']); ?><br>
+                                    <?php endif; ?>
+                                    <?php if (!empty($site_settings['pay_bank_title'])): ?>
+                                    <strong>Account Title:</strong> <?php echo htmlspecialchars($site_settings['pay_bank_title']); ?><br>
+                                    <?php endif; ?>
+                                    <?php if (!empty($site_settings['pay_bank_account'])): ?>
+                                    <strong>Account Number:</strong> <?php echo htmlspecialchars($site_settings['pay_bank_account']); ?><br>
+                                    <?php endif; ?>
+                                    <?php if (!empty($site_settings['pay_bank_iban'])): ?>
+                                    <strong>IBAN:</strong> <?php echo htmlspecialchars($site_settings['pay_bank_iban']); ?><br>
+                                    <?php endif; ?>
                                     <em>Note: Share screenshot of the payment receipt with support for verification.</em>
                                 </p>
                             </div>
@@ -262,8 +270,12 @@ include 'includes/header.php';
                                 <h6 class="fw-bold text-danger mb-2">JazzCash Mobile Wallet Details</h6>
                                 <p class="small text-muted mb-0">
                                     Please send the total amount to the following JazzCash account:<br>
-                                    <strong>Account Title:</strong> Pet Marketplace<br>
-                                    <strong>Mobile Number:</strong> 0300-1234567<br>
+                                    <?php if (!empty($site_settings['pay_jazzcash_name'])): ?>
+                                    <strong>Account Title:</strong> <?php echo htmlspecialchars($site_settings['pay_jazzcash_name']); ?><br>
+                                    <?php endif; ?>
+                                    <?php if (!empty($site_settings['pay_jazzcash_number'])): ?>
+                                    <strong>Mobile Number:</strong> <?php echo htmlspecialchars($site_settings['pay_jazzcash_number']); ?><br>
+                                    <?php endif; ?>
                                     <em>Note: After placing the order, you will need to upload a screenshot of the payment receipt on your order details page.</em>
                                 </p>
                             </div>
@@ -273,8 +285,12 @@ include 'includes/header.php';
                                 <h6 class="fw-bold text-primary mb-2">EasyPaisa Mobile Wallet Details</h6>
                                 <p class="small text-muted mb-0">
                                     Please send the total amount to the following EasyPaisa account:<br>
-                                    <strong>Account Title:</strong> Pet Marketplace<br>
-                                    <strong>Mobile Number:</strong> 0345-1234567<br>
+                                    <?php if (!empty($site_settings['pay_easypaisa_name'])): ?>
+                                    <strong>Account Title:</strong> <?php echo htmlspecialchars($site_settings['pay_easypaisa_name']); ?><br>
+                                    <?php endif; ?>
+                                    <?php if (!empty($site_settings['pay_easypaisa_number'])): ?>
+                                    <strong>Mobile Number:</strong> <?php echo htmlspecialchars($site_settings['pay_easypaisa_number']); ?><br>
+                                    <?php endif; ?>
                                     <em>Note: After placing the order, you will need to upload a screenshot of the payment receipt on your order details page.</em>
                                 </p>
                             </div>

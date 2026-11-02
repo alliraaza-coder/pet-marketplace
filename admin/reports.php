@@ -21,9 +21,9 @@ $p2 = $end_date   . ' 23:59:59';
 $stmt = $conn->prepare("
     SELECT
         COUNT(*) AS total_orders,
-        COALESCE(SUM(CASE WHEN payment_status NOT IN ('pending','payment_submitted','rejected') THEN grand_total ELSE 0 END), 0) AS total_revenue,
+        COALESCE(SUM(CASE WHEN payment_status NOT IN ('pending','payment_submitted','rejected') AND order_status != 'cancelled' THEN grand_total ELSE 0 END), 0) AS total_revenue,
         COALESCE(SUM(CASE WHEN payment_status IN ('seller_payment_sent','seller_payment_received') THEN seller_payment_amount ELSE 0 END), 0) AS released_payouts,
-        COALESCE(SUM(CASE WHEN payment_status IN ('refund_sent','refund_received') THEN buyer_refund_amount ELSE 0 END), 0) AS total_refunds
+        COALESCE(SUM(CASE WHEN payment_status IN ('refund_sent','refund_received') OR order_status = 'cancelled' THEN buyer_refund_amount ELSE 0 END), 0) AS total_refunds
     FROM orders
     WHERE created_at BETWEEN ? AND ?
 ");
@@ -55,6 +55,7 @@ $stmt_cat = $conn->prepare("
     JOIN orders     o  ON oi.order_id   = o.id
     WHERE o.created_at BETWEEN ? AND ?
       AND o.payment_status NOT IN ('pending','payment_submitted','rejected')
+      AND o.order_status != 'cancelled'
     GROUP BY c.id
     ORDER BY category_revenue DESC
     LIMIT 8
@@ -73,6 +74,7 @@ $stmt_seller = $conn->prepare("
     JOIN orders     o  ON oi.order_id  = o.id
     WHERE o.created_at BETWEEN ? AND ?
       AND o.payment_status NOT IN ('pending','payment_submitted','rejected')
+      AND o.order_status != 'cancelled'
     GROUP BY u.id
     ORDER BY total_sales DESC
     LIMIT 5

@@ -587,7 +587,7 @@ include '../includes/header.php';
                                         <select name="subcategory_id" id="subcategory_id" class="form-select rounded-3 border-0 bg-light py-2">
                                             <option value="">-- Select Subcategory --</option>
                                         </select>
-                                        <div class="form-text small" id="subcategoryHelp">Birds, Animals, Parrots, etc.</div>
+                                        <div class="form-text small" id="subcategoryHelp">Birds, Animals, etc.</div>
                                     </div>
                                 </div>
                             </div>

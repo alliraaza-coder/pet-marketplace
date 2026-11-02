@@ -29,6 +29,9 @@ if (!$buyer) {
     exit;
 }
 
+// Fetch Buyer Payment / Refund Account Details
+$buyer_account = get_user_payment_account($conn, $buyer_id);
+
 // Fetch Buyer Metrics Phase 8 Accurate
 $metrics_stmt = $conn->prepare("
     SELECT 
@@ -36,10 +39,10 @@ $metrics_stmt = $conn->prepare("
         SUM(payment_status NOT IN ('pending','payment_submitted','rejected')) AS total_orders,
         SUM(order_status = 'completed') AS completed_orders,
         SUM(order_status = 'cancelled') AS cancelled_orders,
-        (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.user_id = ? AND o.payment_status NOT IN ('pending','payment_submitted','rejected')) AS pets_purchased,
-        COALESCE(SUM(CASE WHEN payment_status NOT IN ('pending','payment_submitted','rejected','refund_sent','refund_received') THEN grand_total ELSE 0 END), 0) AS total_purchase_value,
-        COALESCE(SUM(CASE WHEN payment_status NOT IN ('pending','payment_submitted','rejected') THEN grand_total ELSE 0 END), 0) AS total_amount_paid,
-        COALESCE(SUM(CASE WHEN payment_status IN ('refund_sent','refund_received') THEN buyer_refund_amount ELSE 0 END), 0) AS total_refunds,
+        (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.user_id = ? AND o.order_status = 'completed') AS pets_purchased,
+        COALESCE(SUM(CASE WHEN order_status = 'completed' THEN grand_total ELSE 0 END), 0) AS total_purchase_value,
+        COALESCE(SUM(CASE WHEN order_status = 'completed' THEN grand_total ELSE 0 END), 0) AS total_amount_paid,
+        COALESCE(SUM(CASE WHEN payment_status IN ('refund_sent','refund_received') OR order_status = 'cancelled' THEN buyer_refund_amount ELSE 0 END), 0) AS total_refunds,
         COALESCE(SUM(CASE WHEN payment_status = 'payment_submitted' THEN grand_total ELSE 0 END), 0) AS pending_payments
     FROM orders WHERE user_id = ?
 ");
@@ -69,7 +72,7 @@ include __DIR__ . '/partials/header.php';
 <div class="row g-4">
     <!-- Buyer Profile Card -->
     <div class="col-lg-4">
-        <div class="card border-0 shadow-sm h-100">
+        <div class="card border-0 shadow-sm mb-4">
             <div class="card-body text-center p-4">
                 <img src="<?php echo BASE_URL; ?>/assets/images/<?php echo htmlspecialchars($buyer['profile_pic'] ?? 'default-user.png'); ?>" onerror="this.src='https://ui-avatars.com/api/?name=<?php echo urlencode($buyer['first_name'].' '.$buyer['last_name']); ?>'" class="rounded-circle mb-3 border shadow-sm" style="width: 120px; height: 120px; object-fit: cover;">
                 
@@ -104,6 +107,77 @@ include __DIR__ . '/partials/header.php';
                         </form>
                     <?php endif; ?>
                 </div>
+            </div>
+        </div>
+
+        <!-- Saved Payment & Refund Accounts Card -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-header bg-white border-0 pt-4 pb-2 px-4">
+                <h5 class="fw-bold mb-0 text-dark">
+                    <i class="bi bi-wallet2 text-primary me-2"></i>Saved Account Details
+                </h5>
+                <p class="text-muted small mb-0">For refunds and payments</p>
+            </div>
+            <div class="card-body p-4 pt-2">
+                <?php if ($buyer_account && (!empty($buyer_account['jazzcash_number']) || !empty($buyer_account['easypaisa_number']) || !empty($buyer_account['bank_account_number']) || !empty($buyer_account['bank_iban']))): ?>
+                    <!-- JazzCash -->
+                    <div class="p-3 mb-3 rounded-3 bg-light border">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="badge bg-danger">JazzCash</span>
+                            <span class="text-muted small">Mobile Account</span>
+                        </div>
+                        <?php if (!empty($buyer_account['jazzcash_number'])): ?>
+                            <div class="small text-muted mb-1">Title: <strong class="text-dark"><?php echo htmlspecialchars($buyer_account['jazzcash_name'] ?: 'Not provided'); ?></strong></div>
+                            <div class="small text-muted">Number: <strong class="text-dark font-monospace"><?php echo htmlspecialchars($buyer_account['jazzcash_number']); ?></strong></div>
+                        <?php else: ?>
+                            <span class="text-muted small fst-italic">Not provided</span>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- EasyPaisa -->
+                    <div class="p-3 mb-3 rounded-3 bg-light border">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="badge bg-success">EasyPaisa</span>
+                            <span class="text-muted small">Mobile Account</span>
+                        </div>
+                        <?php if (!empty($buyer_account['easypaisa_number'])): ?>
+                            <div class="small text-muted mb-1">Title: <strong class="text-dark"><?php echo htmlspecialchars($buyer_account['easypaisa_name'] ?: 'Not provided'); ?></strong></div>
+                            <div class="small text-muted">Number: <strong class="text-dark font-monospace"><?php echo htmlspecialchars($buyer_account['easypaisa_number']); ?></strong></div>
+                        <?php else: ?>
+                            <span class="text-muted small fst-italic">Not provided</span>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Bank Transfer -->
+                    <div class="p-3 rounded-3 bg-light border">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="badge bg-primary">Bank Account</span>
+                            <span class="fw-semibold text-dark small"><?php echo htmlspecialchars($buyer_account['bank_name'] ?: 'Bank Transfer'); ?></span>
+                        </div>
+                        <?php if (!empty($buyer_account['bank_account_number']) || !empty($buyer_account['bank_iban'])): ?>
+                            <div class="small text-muted mb-1">Title: <strong class="text-dark"><?php echo htmlspecialchars($buyer_account['bank_account_title'] ?: 'Not provided'); ?></strong></div>
+                            <?php if (!empty($buyer_account['bank_account_number'])): ?>
+                                <div class="small text-muted mb-1">A/C No: <strong class="text-dark font-monospace"><?php echo htmlspecialchars($buyer_account['bank_account_number']); ?></strong></div>
+                            <?php endif; ?>
+                            <?php if (!empty($buyer_account['bank_iban'])): ?>
+                                <div class="small text-muted">IBAN: <strong class="text-dark font-monospace"><?php echo htmlspecialchars($buyer_account['bank_iban']); ?></strong></div>
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <span class="text-muted small fst-italic">Not provided</span>
+                        <?php endif; ?>
+                    </div>
+
+                    <?php if (!empty($buyer_account['updated_at'])): ?>
+                        <div class="text-muted small text-end mt-3">
+                            <i class="bi bi-clock-history me-1"></i>Updated: <?php echo date('d M Y, h:i A', strtotime($buyer_account['updated_at'])); ?>
+                        </div>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-credit-card-2-back fs-2 text-secondary d-block mb-2"></i>
+                        <p class="mb-0 small">No account details saved yet by this buyer.</p>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>

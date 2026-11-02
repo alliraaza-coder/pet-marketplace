@@ -34,6 +34,7 @@ if (!empty($user['force_password_change']) && basename($_SERVER['PHP_SELF']) !==
         .card { border-radius: 12px; }
         .stat-card { transition: transform .2s, box-shadow .2s; }
         .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.08) !important; }
+        .dropdown-menu { z-index: 1060; }
     </style>
 </head>
 <body>
@@ -61,7 +62,7 @@ if (!empty($user['force_password_change']) && basename($_SERVER['PHP_SELF']) !==
                     $unread_count = $conn->query("SELECT COUNT(*) AS cnt FROM admin_notifications WHERE is_read = 0")->fetch_assoc()['cnt'];
                     ?>
                     <div class="dropdown">
-                        <button class="btn btn-light btn-sm rounded-circle position-relative p-2" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="width:36px;height:36px;">
+                        <button class="btn btn-light btn-sm rounded-circle position-relative p-2" type="button" id="notifDropdown" data-bs-toggle="dropdown" data-bs-display="dynamic" aria-expanded="false" style="width:36px;height:36px;">
                             <i class="bi bi-bell"></i>
                             <?php if ($unread_count > 0): ?>
                             <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.65rem;">
@@ -69,7 +70,7 @@ if (!empty($user['force_password_change']) && basename($_SERVER['PHP_SELF']) !==
                             </span>
                             <?php endif; ?>
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow-lg" style="width: 320px;">
+                        <ul class="dropdown-menu dropdown-menu-end shadow-lg" aria-labelledby="notifDropdown" style="width: 320px;">
                             <li><h6 class="dropdown-header fw-bold text-dark d-flex justify-content-between align-items-center">
                                 Notifications
                                 <?php if ($unread_count > 0): ?>
@@ -111,10 +112,10 @@ if (!empty($user['force_password_change']) && basename($_SERVER['PHP_SELF']) !==
                     </div>
 
                     <div class="dropdown">
-                        <button class="btn btn-light btn-sm rounded-pill dropdown-toggle px-3 border" type="button" data-bs-toggle="dropdown">
+                        <button class="btn btn-light btn-sm rounded-pill dropdown-toggle px-3 border" type="button" id="userProfileDropdown" data-bs-toggle="dropdown" data-bs-display="dynamic" aria-expanded="false">
                             <i class="bi bi-person-circle me-1"></i> <?php echo htmlspecialchars($user['first_name']); ?>
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow">
+                        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userProfileDropdown">
                             <li><a class="dropdown-item" href="profile.php"><i class="bi bi-person me-2"></i> Profile Settings</a></li>
                             <li><a class="dropdown-item" href="activity_logs.php"><i class="bi bi-journal-text me-2"></i> Activity Logs</a></li>
                             <li><hr class="dropdown-divider"></li>

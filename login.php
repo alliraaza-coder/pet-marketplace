@@ -98,6 +98,9 @@ include 'includes/header.php';
                             <div class="input-group">
                                 <span class="input-group-text bg-light"><i class="bi bi-lock"></i></span>
                                 <input type="password" class="form-control" id="password" name="password" required placeholder="Enter your password">
+                                <button type="button" class="btn btn-outline-secondary border-start-0 px-3" style="cursor:pointer" onclick="togglePassword('password', this)" title="Show/Hide Password">
+                                    <i class="bi bi-eye"></i>
+                                </button>
                             </div>
                         </div>
                         <div class="mb-4 form-check">

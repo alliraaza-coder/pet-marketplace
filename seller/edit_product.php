@@ -82,6 +82,7 @@ if (isset($_GET['delete_image'])) {
 
 // ── Handle POST update ────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
 
     $title_en       = trim($_POST['title_en'] ?? '');
     $description_en = trim($_POST['description_en'] ?? '');
@@ -314,6 +315,7 @@ include '../includes/header.php';
             <?php endif; ?>
 
             <form action="edit_product.php?id=<?php echo $product_id; ?>" method="POST" enctype="multipart/form-data" novalidate>
+                <?php csrf_field(); ?>
 
                 <div class="row g-4">
 

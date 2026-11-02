@@ -273,11 +273,21 @@ include 'includes/header.php';
                         <div class="row g-3 mb-4">
                             <div class="col-md-6">
                                 <label class="form-label fw-medium">Password <span class="text-danger">*</span></label>
-                                <input type="password" class="form-control" name="password" required minlength="8" placeholder="Min. 8 characters">
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="reg_password" name="password" required minlength="8" placeholder="Min. 8 characters">
+                                    <button type="button" class="btn btn-outline-secondary border-start-0 px-3" style="cursor:pointer" onclick="togglePassword('reg_password', this)" title="Show/Hide Password">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-medium">Confirm Password <span class="text-danger">*</span></label>
-                                <input type="password" class="form-control" name="confirm_password" required minlength="8" placeholder="Re-enter password">
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="reg_confirm_password" name="confirm_password" required minlength="8" placeholder="Re-enter password">
+                                    <button type="button" class="btn btn-outline-secondary border-start-0 px-3" style="cursor:pointer" onclick="togglePassword('reg_confirm_password', this)" title="Show/Hide Password">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 

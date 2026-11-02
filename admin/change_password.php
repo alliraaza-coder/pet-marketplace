@@ -88,15 +88,24 @@ $page_title = "Change Password - " . $site_settings['site_name'];
                         <?php csrf_field(); ?>
                         <div class="mb-3">
                             <label class="form-label text-muted">Current Password</label>
-                            <input type="password" name="current_password" class="form-control bg-dark text-white border-secondary" placeholder="Enter current password (if set)" required>
+                            <div class="input-group">
+                                <input type="password" id="cp_current" name="current_password" class="form-control bg-dark text-white border-secondary" placeholder="Enter current password (if set)" required>
+                                <button type="button" class="btn btn-outline-secondary border-start-0 px-3" style="cursor:pointer" onclick="togglePassword('cp_current', this)" title="Show/Hide Password"><i class="bi bi-eye"></i></button>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label text-muted">New Password (min 8 chars)</label>
-                            <input type="password" name="new_password" class="form-control bg-dark text-white border-secondary" required minlength="8">
+                            <div class="input-group">
+                                <input type="password" id="cp_new" name="new_password" class="form-control bg-dark text-white border-secondary" required minlength="8">
+                                <button type="button" class="btn btn-outline-secondary border-start-0 px-3" style="cursor:pointer" onclick="togglePassword('cp_new', this)" title="Show/Hide Password"><i class="bi bi-eye"></i></button>
+                            </div>
                         </div>
                         <div class="mb-4">
                             <label class="form-label text-muted">Confirm New Password</label>
-                            <input type="password" name="confirm_password" class="form-control bg-dark text-white border-secondary" required minlength="8">
+                            <div class="input-group">
+                                <input type="password" id="cp_confirm" name="confirm_password" class="form-control bg-dark text-white border-secondary" required minlength="8">
+                                <button type="button" class="btn btn-outline-secondary border-start-0 px-3" style="cursor:pointer" onclick="togglePassword('cp_confirm', this)" title="Show/Hide Password"><i class="bi bi-eye"></i></button>
+                            </div>
                         </div>
                         <div class="d-grid">
                             <button type="submit" class="btn btn-warning fw-bold py-2">Update Password & Continue</button>

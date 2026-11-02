@@ -25,21 +25,40 @@ $user_partial = isset($user) ? $user : current_user($conn);
     <!-- Nav Links -->
     <div class="list-group list-group-flush rounded-bottom-4 overflow-hidden">
         <?php
+        // Count pending payouts awaiting seller check
+        $pending_payout_count = 0;
+        $payout_count_stmt = $conn->prepare("
+            SELECT COUNT(DISTINCT o.id) AS c
+            FROM orders o 
+            JOIN order_items oi ON o.id = oi.order_id 
+            WHERE oi.seller_id = ? AND o.payment_status = 'seller_payment_sent' AND o.seller_payment_received = 0
+        ");
+        if ($payout_count_stmt) {
+            $payout_count_stmt->bind_param("i", $seller_id_check);
+            $payout_count_stmt->execute();
+            $pending_payout_count = (int)($payout_count_stmt->get_result()->fetch_assoc()['c'] ?? 0);
+        }
+
         $nav_items = [
-            ['href' => 'dashboard.php',    'icon' => 'bi-speedometer2', 'label' => 'Dashboard'],
-            ['href' => 'products.php',     'icon' => 'bi-box-seam',     'label' => 'My Products'],
-            ['href' => 'add_product.php',  'icon' => 'bi-plus-circle',  'label' => 'Add Product'],
-            ['href' => 'orders.php',       'icon' => 'bi-bag-check',    'label' => 'My Orders'],
-            ['href' => 'analytics.php',    'icon' => 'bi-graph-up',     'label' => 'Earnings'],
-            ['href' => 'profile.php','icon'=>'bi-person-gear',  'label' => 'Profile'],
+            ['href' => 'dashboard.php',        'icon' => 'bi-speedometer2',        'label' => 'Dashboard'],
+            ['href' => 'products.php',         'icon' => 'bi-box-seam',            'label' => 'My Products'],
+            ['href' => 'add_product.php',      'icon' => 'bi-plus-circle',         'label' => 'Add Product'],
+            ['href' => 'orders.php',           'icon' => 'bi-bag-check',           'label' => 'My Orders'],
+            ['href' => 'payments_received.php','icon' => 'bi-cash-coin',           'label' => 'Payments Received', 'badge' => $pending_payout_count],
+            ['href' => 'analytics.php',        'icon' => 'bi-graph-up',            'label' => 'Earnings'],
+            ['href' => 'account.php',          'icon' => 'bi-credit-card-2-back',  'label' => 'Payment Account'],
+            ['href' => 'profile.php',          'icon' => 'bi-person-gear',         'label' => 'Profile'],
         ];
         foreach ($nav_items as $item):
             $is_active = ($current_page === $item['href']) ? 'active bg-warning text-dark fw-bold border-warning' : '';
+            $badge = ($item['href'] === 'payments_received.php' && $pending_payout_count > 0) ? $pending_payout_count : 0;
         ?>
         <a href="<?php echo $item['href']; ?>"
-           class="list-group-item list-group-item-action py-3 <?php echo $is_active; ?>">
-            <i class="bi <?php echo $item['icon']; ?> me-2"></i>
-            <?php echo $item['label']; ?>
+           class="list-group-item list-group-item-action py-3 d-flex justify-content-between align-items-center <?php echo $is_active; ?>">
+            <span><i class="bi <?php echo $item['icon']; ?> me-2"></i><?php echo $item['label']; ?></span>
+            <?php if ($badge > 0): ?>
+                <span class="badge bg-danger rounded-pill"><?php echo $badge; ?></span>
+            <?php endif; ?>
         </a>
         <?php endforeach; ?>
         <?php

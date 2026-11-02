@@ -61,6 +61,7 @@ foreach ($order_items as $item) {
 
 // Handle Order Workflow Updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['workflow_action'])) {
+    verify_csrf();
     $action = sanitize_input($_POST['workflow_action']);
     
     // Restrictions
@@ -387,7 +388,25 @@ include '../includes/header.php';
                                 <?php foreach ($order_items as $item): ?>
                                     <tr>
                                         <td class="ps-4">
-                                            <h6 class="fw-bold mb-0 small"><?php echo htmlspecialchars($item['title_en']); ?></h6>
+                                            <div class="d-flex align-items-center">
+                                                <div class="bg-light rounded-3 overflow-hidden me-2 border flex-shrink-0" style="width: 48px; height: 48px;">
+                                                    <?php 
+                                                    $item_img_src = !empty($item['image_url']) 
+                                                        ? BASE_URL . '/assets/uploads/products/' . htmlspecialchars($item['image_url']) 
+                                                        : get_product_image_url($conn, $item['product_id']); 
+                                                    ?>
+                                                    <img src="<?php echo $item_img_src; ?>" 
+                                                         alt="<?php echo htmlspecialchars($item['title_en']); ?>" 
+                                                         class="w-100 h-100 object-fit-cover"
+                                                         onerror="this.src='https://placehold.co/50x50?text=Pet';">
+                                                </div>
+                                                <div>
+                                                    <h6 class="fw-bold mb-0 small text-dark"><?php echo htmlspecialchars($item['title_en']); ?></h6>
+                                                    <?php if (!empty($item['breed'])): ?>
+                                                        <small class="text-muted d-block" style="font-size:0.72rem;"><?php echo htmlspecialchars($item['breed']); ?></small>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
                                         </td>
                                         <td>x<?php echo $item['quantity']; ?></td>
                                         <td class="pe-4 text-end fw-bold text-success"><?php echo $site_settings['currency'] . number_format($item['total'], 2); ?></td>

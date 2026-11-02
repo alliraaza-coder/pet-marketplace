@@ -6,7 +6,8 @@ require_role('admin');
 
 if (isset($_GET['action']) && $_GET['action'] === 'read_all') {
     $conn->query("UPDATE admin_notifications SET is_read = 1 WHERE is_read = 0");
-    header('Location: index.php');
+    $back = !empty($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'dashboard.php';
+    header('Location: ' . $back);
     exit;
 }
 
@@ -26,10 +27,10 @@ if (isset($_GET['id'])) {
     if ($res && !empty($res['link'])) {
         header('Location: ' . $res['link']);
     } else {
-        header('Location: index.php');
+        header('Location: dashboard.php');
     }
     exit;
 }
 
-header('Location: index.php');
+header('Location: dashboard.php');
 exit;

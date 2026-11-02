@@ -7,7 +7,7 @@ $page_title = "Admin Dashboard";
 $page_heading = "Dashboard Overview";
 include __DIR__ . '/partials/header.php';
 
-// â”€â”€ 1. Real-time Metrics Queries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── 1. Real-time Metrics Queries ────────────────────────────
 // Users counts
 $u_res = $conn->query("
     SELECT 
@@ -26,31 +26,34 @@ $p_res = $conn->query("
     FROM products WHERE is_deleted = 0
 ")->fetch_assoc();
 
-// Orders counts & Products Sold
+// Orders counts & Products Sold (Real-time Accurate)
 $o_res = $conn->query("
     SELECT 
         COUNT(*) AS total_orders,
-        SUM(payment_status = 'payment_submitted') AS pending_payment_requests,
-        SUM(payment_status NOT IN ('pending','payment_submitted','rejected')) AS approved_orders,
-        (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.payment_status NOT IN ('pending','payment_submitted','rejected')) AS total_products_sold
+        COALESCE(SUM(order_status = 'completed'), 0) AS completed_orders,
+        COALESCE(SUM(order_status NOT IN ('completed', 'cancelled')), 0) AS active_orders,
+        COALESCE(SUM(order_status = 'cancelled'), 0) AS cancelled_orders,
+        COALESCE(SUM(payment_status = 'payment_submitted'), 0) AS pending_payment_requests,
+        COALESCE(SUM(payment_status NOT IN ('pending','payment_submitted','rejected') AND order_status != 'cancelled'), 0) AS approved_orders,
+        (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.order_status = 'completed') AS total_products_sold
     FROM orders
 ")->fetch_assoc();
 
 // Financial counts Phase 8 Accurate
 $f_res = $conn->query("
     SELECT 
-        COALESCE(SUM(CASE WHEN payment_status NOT IN ('pending','payment_submitted','rejected') THEN grand_total ELSE 0 END), 0) AS total_payments_received,
+        COALESCE(SUM(CASE WHEN payment_status NOT IN ('pending','payment_submitted','rejected') AND order_status != 'cancelled' THEN grand_total ELSE 0 END), 0) AS total_payments_received,
         COALESCE(SUM(CASE WHEN payment_status IN ('seller_payment_sent', 'seller_payment_received') THEN seller_payment_amount ELSE 0 END), 0) AS total_paid_to_sellers,
-        COALESCE(SUM(CASE WHEN payment_status IN ('refund_sent', 'refund_received') THEN buyer_refund_amount ELSE 0 END), 0) AS total_refunds_sent,
+        COALESCE(SUM(CASE WHEN payment_status IN ('refund_sent', 'refund_received') OR order_status = 'cancelled' THEN buyer_refund_amount ELSE 0 END), 0) AS total_refunds_sent,
         COALESCE(SUM(CASE WHEN payment_status = 'payment_submitted' THEN grand_total ELSE 0 END), 0) AS pending_buyer_payments,
-        COALESCE(SUM(CASE WHEN payment_status = 'held' AND seller_delivered=1 AND buyer_received=1 AND admin_verified=1 AND seller_payment_sent_at IS NULL THEN seller_payment_amount ELSE (CASE WHEN payment_status='held' THEN grand_total ELSE 0 END) END), 0) AS pending_seller_payments,
-        COALESCE(SUM(CASE WHEN payment_status IN ('held','refund_submitted') AND order_status='cancelled' AND buyer_refund_sent_at IS NULL THEN buyer_refund_amount ELSE (CASE WHEN order_status='cancelled' THEN grand_total ELSE 0 END) END), 0) AS pending_refunds
+        COALESCE(SUM(CASE WHEN payment_status = 'held' AND seller_delivered=1 AND buyer_received=1 AND admin_verified=1 AND seller_payment_sent_at IS NULL THEN seller_payment_amount ELSE (CASE WHEN payment_status='held' AND order_status != 'cancelled' THEN grand_total ELSE 0 END) END), 0) AS pending_seller_payments,
+        COALESCE(SUM(CASE WHEN payment_status IN ('held','refund_submitted') AND order_status='cancelled' AND buyer_refund_sent_at IS NULL THEN buyer_refund_amount ELSE (CASE WHEN order_status='cancelled' AND buyer_refund_sent_at IS NULL THEN grand_total ELSE 0 END) END), 0) AS pending_refunds
     FROM orders
 ")->fetch_assoc();
 
-$admin_held_balance = $f_res['total_payments_received'] - $f_res['total_paid_to_sellers'] - $f_res['total_refunds_sent'];
+$admin_held_balance = max(0, $f_res['total_payments_received'] - $f_res['total_paid_to_sellers'] - $f_res['total_refunds_sent']);
 
-// â”€â”€ 2. Chart Data (Monthly Revenue & Orders last 6 months) â”€â”€
+// ── 2. Chart Data (Monthly Revenue & Orders last 6 months) ───
 $chart_months = [];
 $chart_revenue = [];
 $chart_orders = [];
@@ -62,8 +65,8 @@ for ($i = 5; $i >= 0; $i--) {
     $m_label = date('M Y', strtotime("-$i months"));
     $chart_months[] = $m_label;
 
-    // Monthly revenue (released orders)
-    $rev_stmt = $conn->prepare("SELECT COALESCE(SUM(grand_total), 0) AS rev FROM orders WHERE payment_status = 'released' AND created_at BETWEEN ? AND ?");
+    // Monthly revenue (completed orders)
+    $rev_stmt = $conn->prepare("SELECT COALESCE(SUM(grand_total), 0) AS rev FROM orders WHERE order_status = 'completed' AND created_at BETWEEN ? AND ?");
     $rev_stmt->bind_param("ss", $m_start, $m_end);
     $rev_stmt->execute();
     $chart_revenue[] = (float)$rev_stmt->get_result()->fetch_assoc()['rev'];
@@ -81,9 +84,11 @@ for ($i = 5; $i >= 0; $i--) {
     $chart_users[] = (int)$usr_stmt->get_result()->fetch_assoc()['cnt'];
 }
 
-// â”€â”€ 3. Recent Activity Lists â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── 3. Recent Activity Lists ─────────────────────────────────
 $recent_orders = $conn->query("
-    SELECT o.id, o.order_number, o.grand_total, o.order_status, o.payment_status, o.created_at, u.first_name, u.last_name
+    SELECT o.id, o.order_number, o.grand_total, o.order_status, o.payment_status, o.created_at, u.first_name, u.last_name,
+           (SELECT p.title_en FROM order_items oi JOIN products p ON oi.product_id = p.id WHERE oi.order_id = o.id LIMIT 1) AS product_title,
+           (SELECT pi.image_url FROM order_items oi JOIN products p ON oi.product_id = p.id JOIN product_images pi ON pi.product_id = p.id WHERE oi.order_id = o.id AND pi.is_primary = 1 LIMIT 1) AS product_thumb
     FROM orders o JOIN users u ON o.user_id = u.id
     ORDER BY o.created_at DESC LIMIT 5
 ");
@@ -149,69 +154,100 @@ $recent_transactions = $conn->query("
             </div>
         </div>
     </div>
-    
-    <!-- Secondary Stats row 1 -->
-    <div class="col-6 col-md-3 col-xl-2">
+</div>
+
+<!-- Real-time Orders Lifecycle Overview Row -->
+<div class="row g-3 mb-4">
+    <!-- Total Orders Placed -->
+    <div class="col-6 col-md-4 col-xl-2">
         <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-primary">
-            <h5 class="fw-bold mb-0 mt-2"><?php echo number_format($o_res['total_orders'] ?? 0); ?></h5>
-            <span class="text-muted small">Total Requests</span>
+            <div class="stat-icon text-primary mb-1"><i class="bi bi-receipt fs-4"></i></div>
+            <h4 class="fw-bold mb-0 text-primary"><?php echo number_format($o_res['total_orders'] ?? 0); ?></h4>
+            <span class="text-muted small fw-semibold">Total Orders Placed</span>
         </div>
     </div>
-    <div class="col-6 col-md-3 col-xl-2">
-        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-warning">
-            <h5 class="fw-bold mb-0 mt-2 text-warning"><?php echo number_format($o_res['pending_payment_requests'] ?? 0); ?></h5>
-            <span class="text-muted small">Pending Payments</span>
-        </div>
-    </div>
-    <div class="col-6 col-md-3 col-xl-2">
+    <!-- Completed Orders -->
+    <div class="col-6 col-md-4 col-xl-2">
         <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-success">
-            <h5 class="fw-bold mb-0 mt-2 text-success"><?php echo number_format($o_res['approved_orders'] ?? 0); ?></h5>
-            <span class="text-muted small">Approved Orders</span>
+            <div class="stat-icon text-success mb-1"><i class="bi bi-check2-circle fs-4"></i></div>
+            <h4 class="fw-bold mb-0 text-success"><?php echo number_format($o_res['completed_orders'] ?? 0); ?></h4>
+            <span class="text-muted small fw-semibold">Completed Orders</span>
         </div>
     </div>
-    <div class="col-6 col-md-3 col-xl-2">
+    <!-- Active Orders -->
+    <div class="col-6 col-md-4 col-xl-2">
         <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-info">
-            <h5 class="fw-bold mb-0 mt-2"><?php echo number_format($o_res['total_products_sold'] ?? 0); ?></h5>
-            <span class="text-muted small">Products Sold</span>
+            <div class="stat-icon text-info mb-1"><i class="bi bi-hourglass-split fs-4"></i></div>
+            <h4 class="fw-bold mb-0 text-info"><?php echo number_format($o_res['active_orders'] ?? 0); ?></h4>
+            <span class="text-muted small fw-semibold">Active Orders</span>
         </div>
     </div>
-    <div class="col-6 col-md-3 col-xl-2">
+    <!-- Cancelled Orders -->
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-danger">
+            <div class="stat-icon text-danger mb-1"><i class="bi bi-x-circle fs-4"></i></div>
+            <h4 class="fw-bold mb-0 text-danger"><?php echo number_format($o_res['cancelled_orders'] ?? 0); ?></h4>
+            <span class="text-muted small fw-semibold">Cancelled Orders</span>
+        </div>
+    </div>
+    <!-- Products Sold -->
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-dark">
+            <div class="stat-icon text-dark mb-1"><i class="bi bi-bag-check fs-4"></i></div>
+            <h4 class="fw-bold mb-0 text-dark"><?php echo number_format($o_res['total_products_sold'] ?? 0); ?></h4>
+            <span class="text-muted small fw-semibold">Products Sold</span>
+        </div>
+    </div>
+    <!-- Pending Approvals -->
+    <div class="col-6 col-md-4 col-xl-2">
         <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-warning">
-            <h5 class="fw-bold mb-0 mt-2"><?php echo $site_settings['currency'] . number_format($f_res['pending_seller_payments'] ?? 0, 0); ?></h5>
+            <div class="stat-icon text-warning mb-1"><i class="bi bi-shield-exclamation fs-4"></i></div>
+            <h4 class="fw-bold mb-0 text-warning"><?php echo number_format($o_res['pending_payment_requests'] ?? 0); ?></h4>
+            <span class="text-muted small fw-semibold">Pending Approvals</span>
+        </div>
+    </div>
+</div>
+
+<!-- Secondary Platform & Payouts Overview -->
+<div class="row g-3 mb-4">
+    <!-- Pending Payouts -->
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-warning">
+            <h5 class="fw-bold mb-0 mt-2 text-warning"><?php echo $site_settings['currency'] . number_format($f_res['pending_seller_payments'] ?? 0, 0); ?></h5>
             <span class="text-muted small">Pending Payouts</span>
         </div>
     </div>
-    <div class="col-6 col-md-3 col-xl-2">
+    <!-- Pending Refunds -->
+    <div class="col-6 col-md-4 col-xl">
         <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-danger">
-            <h5 class="fw-bold mb-0 mt-2"><?php echo $site_settings['currency'] . number_format($f_res['pending_refunds'] ?? 0, 0); ?></h5>
+            <h5 class="fw-bold mb-0 mt-2 text-danger"><?php echo $site_settings['currency'] . number_format($f_res['pending_refunds'] ?? 0, 0); ?></h5>
             <span class="text-muted small">Pending Refunds</span>
         </div>
     </div>
-
-    <!-- Users / Products -->
-    <div class="col-6 col-md-4">
-        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100">
-            <div class="text-primary mb-1"><i class="bi bi-people fs-4"></i></div>
-            <h5 class="fw-bold mb-0"><?php echo number_format($u_res['total_buyers'] ?? 0); ?> / <?php echo number_format($u_res['total_sellers'] ?? 0); ?></h5>
+    <!-- Users -->
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-primary">
+            <h5 class="fw-bold mb-0 mt-2 text-primary"><?php echo number_format($u_res['total_buyers'] ?? 0); ?> / <?php echo number_format($u_res['total_sellers'] ?? 0); ?></h5>
             <span class="text-muted small">Total Buyers / Sellers</span>
         </div>
     </div>
-    <div class="col-6 col-md-4">
-        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100">
-            <div class="text-secondary mb-1"><i class="bi bi-box-seam fs-4"></i></div>
-            <h5 class="fw-bold mb-0"><?php echo number_format($p_res['total_products'] ?? 0); ?></h5>
+    <!-- Total Products -->
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-secondary">
+            <h5 class="fw-bold mb-0 mt-2"><?php echo number_format($p_res['total_products'] ?? 0); ?></h5>
             <span class="text-muted small">Total Products</span>
         </div>
     </div>
-    <div class="col-6 col-md-4">
-        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100">
-            <div class="text-success mb-1"><i class="bi bi-check-circle fs-4"></i></div>
-            <h5 class="fw-bold mb-0 text-success"><?php echo number_format($p_res['active_products'] ?? 0); ?></h5>
+    <!-- Active Products -->
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card border-0 shadow-sm stat-card bg-white p-3 text-center h-100 border-start border-4 border-success">
+            <h5 class="fw-bold mb-0 mt-2 text-success"><?php echo number_format($p_res['active_products'] ?? 0); ?></h5>
             <span class="text-muted small">Active Products</span>
         </div>
     </div>
 </div>
-<!-- â”€â”€ 4 Interactive Charts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+
+<!-- ── 4 Interactive Charts ─────────────────────────────────── -->
 <div class="row g-4 mb-4">
     <div class="col-lg-6">
         <div class="card border-0 shadow-sm p-4 h-100">
@@ -239,7 +275,7 @@ $recent_transactions = $conn->query("
     </div>
 </div>
 
-<!-- â”€â”€ Recent Activity Tables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<!-- ── Recent Activity Tables ───────────────────────────────── -->
 <div class="row g-4">
     <!-- Recent Orders -->
     <div class="col-lg-6">
@@ -253,25 +289,62 @@ $recent_transactions = $conn->query("
                     <thead class="table-light">
                         <tr>
                             <th>Order #</th>
+                            <th>Product</th>
                             <th>Customer</th>
                             <th>Amount</th>
                             <th>Payment</th>
                             <th>Status</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if ($recent_orders && $recent_orders->num_rows > 0): ?>
-                            <?php while ($o = $recent_orders->fetch_assoc()): ?>
+                            <?php while ($o = $recent_orders->fetch_assoc()): 
+                                $p_img = !empty($o['product_thumb']) ? BASE_URL . '/assets/uploads/products/' . htmlspecialchars($o['product_thumb']) : 'https://placehold.co/36x36?text=Pet';
+                                
+                                // Payment badge logic
+                                $ps = $o['payment_status'];
+                                $ps_label = ucfirst(str_replace('_', ' ', $ps));
+                                $ps_badge = 'bg-secondary bg-opacity-10 text-secondary border border-secondary';
+                                if (in_array($ps, ['seller_payment_received', 'released', 'seller_payment_sent', 'held'])) {
+                                    $ps_label = 'Payment Delivered';
+                                    $ps_badge = 'bg-success bg-opacity-10 text-success border border-success';
+                                } elseif (in_array($ps, ['refund_received', 'refund_sent', 'refund_submitted', 'refunded'])) {
+                                    $ps_label = 'Payment Refunded';
+                                    $ps_badge = 'bg-secondary bg-opacity-10 text-secondary border border-secondary';
+                                } elseif ($ps === 'payment_submitted') {
+                                    $ps_label = 'Payment Submitted';
+                                    $ps_badge = 'bg-info bg-opacity-10 text-info border border-info';
+                                } elseif ($ps === 'pending') {
+                                    $ps_label = 'Pending Payment';
+                                    $ps_badge = 'bg-warning bg-opacity-10 text-warning border border-warning';
+                                }
+                                
+                                // Order status badge logic
+                                $os = $o['order_status'];
+                                $os_badge = 'bg-secondary';
+                                if ($os === 'completed' || $os === 'delivered') $os_badge = 'bg-success';
+                                elseif ($os === 'cancelled') $os_badge = 'bg-danger';
+                                elseif ($os === 'pending') $os_badge = 'bg-warning text-dark';
+                                elseif ($os === 'shipped') $os_badge = 'bg-info text-dark';
+                            ?>
                                 <tr>
-                                    <td class="fw-bold text-primary">#<?php echo htmlspecialchars($o['order_number']); ?></td>
+                                    <td class="fw-bold"><a href="order_details.php?id=<?php echo $o['id']; ?>" class="text-decoration-none text-primary">#<?php echo htmlspecialchars($o['order_number']); ?></a></td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <img src="<?php echo $p_img; ?>" class="rounded border object-fit-cover flex-shrink-0" style="width: 36px; height: 36px;" onerror="this.src='https://placehold.co/36x36?text=Pet';">
+                                            <span class="small fw-semibold text-dark text-truncate" style="max-width: 110px;" title="<?php echo htmlspecialchars($o['product_title'] ?? 'Pet'); ?>"><?php echo htmlspecialchars($o['product_title'] ?? 'Pet'); ?></span>
+                                        </div>
+                                    </td>
                                     <td><?php echo htmlspecialchars($o['first_name'] . ' ' . $o['last_name']); ?></td>
-                                    <td class="fw-bold"><?php echo $site_settings['currency'] . number_format($o['grand_total'] ?? 0, 2); ?></td>
-                                    <td><span class="badge bg-light text-dark border"><?php echo ucfirst(htmlspecialchars($o['payment_status'])); ?></span></td>
-                                    <td><span class="badge bg-secondary rounded-pill"><?php echo ucfirst(str_replace('_',' ',$o['order_status'])); ?></span></td>
+                                    <td class="fw-bold text-success"><?php echo $site_settings['currency'] . number_format($o['grand_total'] ?? 0, 2); ?></td>
+                                    <td><span class="badge <?php echo $ps_badge; ?> px-2 py-1 rounded-pill small"><?php echo $ps_label; ?></span></td>
+                                    <td><span class="badge <?php echo $os_badge; ?> rounded-pill px-2 py-1"><?php echo ucfirst(str_replace('_',' ',$os)); ?></span></td>
+                                    <td><a href="order_details.php?id=<?php echo $o['id']; ?>" class="btn btn-sm btn-outline-primary rounded-pill px-2 py-0" style="font-size: 0.75rem;">View</a></td>
                                 </tr>
                             <?php endwhile; ?>
                         <?php else: ?>
-                            <tr><td colspan="5" class="text-center py-3 text-muted">No orders found.</td></tr>
+                            <tr><td colspan="7" class="text-center py-3 text-muted">No orders found.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>

@@ -40,12 +40,12 @@
             <div class="col-lg-2 col-md-6 mb-5 footer-widget">
                 <h4>Categories</h4>
                 <ul class="footer-links">
-                    <li><a href="#">Parrots & Birds</a></li>
-                    <li><a href="#">Cats & Dogs</a></li>
-                    <li><a href="#">Small Pets</a></li>
-                    <li><a href="#">Bird Foods</a></li>
-                    <li><a href="#">Pet Accessories</a></li>
-                    <li><a href="#">Cages & Houses</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>/shop.php?category=birds-animals">Birds & Animals</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>/shop.php?category=birds-animals&subcategory=birds">Birds</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>/shop.php?category=birds-animals&subcategory=animals">Animals</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>/shop.php?category=seeds-animal-food">Seeds & Animal Food</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>/shop.php?category=cages-houses">Cages & Houses</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>/shop.php?category=market-specials">Market Specials</a></li>
                 </ul>
             </div>
 
@@ -93,7 +93,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <!-- Custom JS -->
-<script src="<?php echo BASE_URL; ?>/assets/js/main.js"></script>
+<script src="<?php echo BASE_URL; ?>/assets/js/main.js?v=<?php echo filemtime($_SERVER['DOCUMENT_ROOT'].'/pet_marketplace/assets/js/main.js'); ?>"></script>
 
 </body>
 </html>

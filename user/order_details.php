@@ -45,6 +45,7 @@ $order_items = $item_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 // Handle Buyer Actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['buyer_action'])) {
+    verify_csrf();
     $action = sanitize_input($_POST['buyer_action']);
     
     if ($action === 'cancel' && in_array($order['order_status'], ['pending', 'pending_payment']) && in_array($order['payment_status'], ['pending', 'rejected'])) {
@@ -443,14 +444,32 @@ include '../includes/header.php';
                                 <?php foreach ($order_items as $item): ?>
                                     <tr>
                                         <td class="ps-4">
-                                            <h6 class="fw-bold mb-0 small"><?php echo htmlspecialchars($item['title_en']); ?></h6>
-                                            <?php if (in_array($order['order_status'], ['completed', 'delivered'])): ?>
-                                                <?php if ($item['review_id']): ?>
-                                                    <span class="badge bg-secondary mt-1" style="font-size:0.7rem;">Review Submitted</span>
-                                                <?php else: ?>
-                                                    <button type="button" class="btn btn-sm btn-outline-warning mt-1 rounded-pill py-0 px-2" style="font-size:0.75rem;" data-bs-toggle="modal" data-bs-target="#reviewModal<?php echo $item['product_id']; ?>"><i class="bi bi-star-fill me-1"></i>Leave Review</button>
-                                                <?php endif; ?>
-                                            <?php endif; ?>
+                                            <div class="d-flex align-items-center">
+                                                <div class="bg-light rounded-3 overflow-hidden me-3 border flex-shrink-0" style="width: 58px; height: 58px;">
+                                                    <?php 
+                                                    $item_img_src = !empty($item['image_url']) 
+                                                        ? BASE_URL . '/assets/uploads/products/' . htmlspecialchars($item['image_url']) 
+                                                        : get_product_image_url($conn, $item['product_id']); 
+                                                    ?>
+                                                    <img src="<?php echo $item_img_src; ?>" 
+                                                         alt="<?php echo htmlspecialchars($item['title_en']); ?>" 
+                                                         class="w-100 h-100 object-fit-cover"
+                                                         onerror="this.src='https://placehold.co/60x60?text=Pet';">
+                                                </div>
+                                                <div>
+                                                    <h6 class="fw-bold mb-0 small text-dark"><?php echo htmlspecialchars($item['title_en']); ?></h6>
+                                                    <?php if (!empty($item['breed'])): ?>
+                                                        <small class="text-muted d-block" style="font-size: 0.75rem;">Breed: <?php echo htmlspecialchars($item['breed']); ?></small>
+                                                    <?php endif; ?>
+                                                    <?php if (in_array($order['order_status'], ['completed', 'delivered'])): ?>
+                                                        <?php if ($item['review_id']): ?>
+                                                            <span class="badge bg-secondary mt-1" style="font-size:0.7rem;">Review Submitted</span>
+                                                        <?php else: ?>
+                                                            <button type="button" class="btn btn-sm btn-outline-warning mt-1 rounded-pill py-0 px-2" style="font-size:0.75rem;" data-bs-toggle="modal" data-bs-target="#reviewModal<?php echo $item['product_id']; ?>"><i class="bi bi-star-fill me-1"></i>Leave Review</button>
+                                                        <?php endif; ?>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
                                         </td>
                                         <td><?php echo $site_settings['currency'] . number_format($item['price'], 2); ?></td>
                                         <td><?php echo $item['quantity']; ?></td>

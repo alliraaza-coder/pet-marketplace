@@ -11,6 +11,7 @@ $admin_id = $_SESSION['user_id'];
 
 // Handle Actions (Verify, Unverify, Activate, Suspend, Delete)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['seller_id'])) {
+    verify_csrf();
     $action    = sanitize_input($_POST['action']);
     $seller_id = (int)$_POST['seller_id'];
 
@@ -188,6 +189,7 @@ $sellers = $stmt->get_result();
                                             <?php if ($s['is_verified']): ?>
                                                 <li>
                                                     <form action="sellers.php" method="POST" class="d-inline">
+                                                        <?php csrf_field(); ?>
                                                         <input type="hidden" name="action" value="unverify">
                                                         <input type="hidden" name="seller_id" value="<?php echo $s['id']; ?>">
                                                         <button type="submit" class="dropdown-item text-secondary"><i class="bi bi-patch-minus me-2"></i> Remove Verification</button>
@@ -196,6 +198,7 @@ $sellers = $stmt->get_result();
                                             <?php else: ?>
                                                 <li>
                                                     <form action="sellers.php" method="POST" class="d-inline">
+                                                        <?php csrf_field(); ?>
                                                         <input type="hidden" name="action" value="verify">
                                                         <input type="hidden" name="seller_id" value="<?php echo $s['id']; ?>">
                                                         <button type="submit" class="dropdown-item text-primary"><i class="bi bi-patch-check-fill me-2"></i> Verify Seller</button>
@@ -206,6 +209,7 @@ $sellers = $stmt->get_result();
                                             <?php if ($s['status'] === 'active'): ?>
                                                 <li>
                                                     <form action="sellers.php" method="POST" class="d-inline">
+                                                        <?php csrf_field(); ?>
                                                         <input type="hidden" name="action" value="suspend">
                                                         <input type="hidden" name="seller_id" value="<?php echo $s['id']; ?>">
                                                         <button type="submit" class="dropdown-item text-warning" onclick="return confirm('Suspend this seller account?');"><i class="bi bi-pause-circle me-2"></i> Suspend Account</button>
@@ -214,6 +218,7 @@ $sellers = $stmt->get_result();
                                             <?php else: ?>
                                                 <li>
                                                     <form action="sellers.php" method="POST" class="d-inline">
+                                                        <?php csrf_field(); ?>
                                                         <input type="hidden" name="action" value="activate">
                                                         <input type="hidden" name="seller_id" value="<?php echo $s['id']; ?>">
                                                         <button type="submit" class="dropdown-item text-success"><i class="bi bi-check-circle me-2"></i> Activate Account</button>
@@ -223,6 +228,7 @@ $sellers = $stmt->get_result();
                                             
                                             <li>
                                                 <form action="sellers.php" method="POST" class="d-inline">
+                                                    <?php csrf_field(); ?>
                                                     <input type="hidden" name="action" value="delete">
                                                     <input type="hidden" name="seller_id" value="<?php echo $s['id']; ?>">
                                                     <button type="submit" class="dropdown-item text-danger" onclick="return confirm('Are you sure you want to delete this seller?');"><i class="bi bi-trash me-2"></i> Delete</button>

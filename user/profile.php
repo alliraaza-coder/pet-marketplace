@@ -110,6 +110,7 @@ include '../includes/header.php';
                     <a href="dashboard.php" class="list-group-item list-group-item-action py-3"><i class="bi bi-grid me-2"></i> Dashboard</a>
                     <a href="profile.php"   class="list-group-item list-group-item-action active bg-success border-success py-3"><i class="bi bi-person me-2"></i> My Profile</a>
                     <a href="orders.php"    class="list-group-item list-group-item-action py-3"><i class="bi bi-box-seam me-2"></i> My Orders</a>
+                    <a href="account.php"   class="list-group-item list-group-item-action py-3"><i class="bi bi-credit-card-2-back me-2"></i> Payment Account</a>
                     <a href="../wishlist.php" class="list-group-item list-group-item-action py-3"><i class="bi bi-heart me-2"></i> Wishlist</a>
                     <?php
                         $prof_notif_q = $conn->prepare("SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND is_read = 0");

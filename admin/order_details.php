@@ -17,8 +17,8 @@ if (!$order_id) {
     exit;
 }
 
-// Handle Refund Action
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'refund') {
+// Handle Refund / Cancel Action
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action']) && $_POST['action'] === 'refund') {
     $conn->begin_transaction();
     try {
         // Fetch order to verify state
@@ -27,46 +27,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $chk_stmt->execute();
         $chk = $chk_stmt->get_result()->fetch_assoc();
 
-        if ($chk['payment_status'] === 'released') {
-            throw new Exception("Cannot refund an order that has already been released to the seller.");
+        if ($chk['payment_status'] === 'released' || $chk['payment_status'] === 'seller_payment_received') {
+            throw new Exception("Cannot refund an order that has already been paid and released to the seller.");
         }
-        if ($chk['payment_status'] === 'refunded') {
-            throw new Exception("Order is already refunded.");
+        if (in_array($chk['payment_status'], ['refund_sent', 'refund_received', 'refunded'])) {
+            throw new Exception("Order is already refunded or refund has been sent.");
         }
 
-        // Refund Buyer -> payment_status = refunded, order_status = cancelled
-        $upd_stmt = $conn->prepare("UPDATE orders SET payment_status = 'refunded', order_status = 'cancelled' WHERE id = ?");
+        // Cancel order -> order_status = cancelled
+        $upd_stmt = $conn->prepare("UPDATE orders SET order_status = 'cancelled' WHERE id = ?");
         $upd_stmt->bind_param("i", $order_id);
         $upd_stmt->execute();
 
-        // Phase 6: No automatic stock restoration on cancellation/refund.
-        // Seller must manually re-add stock via Edit Product if order is cancelled.
-
-        // Record Transaction
-        $amount_stmt = $conn->prepare("SELECT grand_total FROM orders WHERE id = ?");
-        $amount_stmt->bind_param("i", $order_id);
-        $amount_stmt->execute();
-        $order_amount = $amount_stmt->get_result()->fetch_assoc()['grand_total'];
-
-        $tx_stmt = $conn->prepare("INSERT INTO transactions (order_id, transaction_type, amount, status) VALUES (?, 'refund', ?, 'completed')");
-        $tx_stmt->bind_param("id", $order_id, $order_amount);
-        $tx_stmt->execute();
-
-        log_admin_activity($conn, $admin_id, "Refunded Order", "Refunded Order ID: $order_id. Amount: $order_amount");
-        
-        // Add order audit log
+        log_admin_activity($conn, $admin_id, "Cancelled Order", "Cancelled Order ID: $order_id for refund processing.");
         if (function_exists('log_order_audit')) {
-            log_order_audit($conn, $order_id, "Admin refunded order", "Escrow closed. Amount: $order_amount", $admin_id);
+            log_order_audit($conn, $order_id, "Admin cancelled order", "Awaiting refund disbursement in Escrow.", $admin_id);
         }
-        
+
         $conn->commit();
-        $_SESSION['success'] = "Order has been refunded to the buyer and cancelled.";
+
+        if (in_array($chk['payment_status'], ['held', 'payment_submitted'])) {
+            $_SESSION['info'] = "Order #$order_id has been cancelled. Please disburse the refund and upload receipt proof in Escrow below.";
+            header("Location: escrow.php");
+            exit;
+        } else {
+            $_SESSION['success'] = "Order #$order_id has been cancelled.";
+            header("Location: order_details.php?id=$order_id");
+            exit;
+        }
     } catch (Exception $e) {
         $conn->rollback();
-        $_SESSION['error'] = "Refund failed: " . $e->getMessage();
+        $_SESSION['error'] = "Action failed: " . $e->getMessage();
+        header("Location: order_details.php?id=$order_id");
+        exit;
     }
-    header("Location: order_details.php?id=$order_id");
-    exit;
 }
 
 // Fetch Order Information
@@ -182,10 +176,10 @@ include __DIR__ . '/partials/header.php';
                                             if (!empty($item['image'])) {
                                                 $item_img = BASE_URL . '/assets/uploads/products/' . htmlspecialchars($item['image']);
                                             } else {
-                                                $item_img = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><rect width="50" height="50" fill="%23f3f3f3"/><text x="50%" y="50%" font-family="sans-serif" font-size="7" fill="%23aaa" text-anchor="middle" dy=".3em">No Image</text></svg>';
+                                                $item_img = get_product_image_url($conn, $item['product_id']);
                                             }
                                             ?>
-                                            <img src="<?php echo $item_img; ?>" class="rounded me-3 object-fit-cover" width="50" height="50" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'50\' height=\'50\'><rect width=\'50\' height=\'50\' fill=\'%23f3f3f3\'/><text x=\'50%25\' y=\'50%25\' font-family=\'sans-serif\' font-size=\'7\' fill=\'%23aaa\' text-anchor=\'middle\' dy=\'.3em\'>No Image</text></svg>'">
+                                            <img src="<?php echo $item_img; ?>" class="rounded me-3 object-fit-cover border" width="55" height="55" onerror="this.src='https://placehold.co/55x55?text=Pet';">
                                             <div>
                                                 <a href="product_details.php?id=<?php echo $item['product_id']; ?>" class="fw-bold text-dark text-decoration-none">
                                                     <?php echo htmlspecialchars($item['title_en']); ?>
@@ -231,30 +225,112 @@ include __DIR__ . '/partials/header.php';
             <div class="card-body p-4">
                 <ul class="list-unstyled mb-0 position-relative timeline-container ms-3 border-start border-2 border-primary border-opacity-25 pb-3">
                     <?php 
-                    // Determine steps based on statuses
+                    // Fetch audit logs once to populate both timeline timestamps and audit log table
+                    $audit_stmt = $conn->prepare("
+                        SELECT a.*, u.first_name, u.last_name, u.role 
+                        FROM order_audits a 
+                        LEFT JOIN users u ON a.user_id = u.id 
+                        WHERE a.order_id = ? 
+                        ORDER BY a.created_at DESC
+                    ");
+                    $audit_stmt->bind_param("i", $order_id);
+                    $audit_stmt->execute();
+                    $audit_res = $audit_stmt->get_result();
+                    $audits_list = [];
+                    while ($al_row = $audit_res->fetch_assoc()) {
+                        $audits_list[] = $al_row;
+                    }
+
+                    // Helper: find chronological timestamp by action keyword(s)
+                    $get_audit_time = function($keywords) use ($audits_list) {
+                        if (!is_array($keywords)) {
+                            $keywords = [$keywords];
+                        }
+                        // Search earliest to latest
+                        foreach (array_reverse($audits_list) as $a) {
+                            foreach ($keywords as $kw) {
+                                if (stripos($a['action'], $kw) !== false) {
+                                    return $a['created_at'];
+                                }
+                            }
+                        }
+                        return '';
+                    };
+
+                    // Determine steps based on live audit history and order statuses
                     $steps = [];
-                    $steps[] = ['title' => 'Order Placed', 'time' => $order['created_at'], 'done' => true];
-                    
-                    $paid = ($order['payment_status'] !== 'pending');
-                    $steps[] = ['title' => 'Payment Received (Escrow)', 'time' => $paid ? $order['updated_at'] : '', 'done' => $paid];
-                    
-                    $accepted = in_array($order['order_status'], ['accepted', 'shipped', 'delivered', 'completed']);
-                    $steps[] = ['title' => 'Seller Accepted Order', 'time' => '', 'done' => $accepted];
 
-                    $shipped = in_array($order['order_status'], ['shipped', 'delivered', 'completed']);
-                    $steps[] = ['title' => 'Out for Delivery', 'time' => '', 'done' => $shipped];
+                    // 1. Order Placed
+                    $steps[] = [
+                        'title' => 'Order Placed',
+                        'time' => $order['created_at'],
+                        'done' => true
+                    ];
 
-                    $delivered = in_array($order['order_status'], ['delivered', 'completed']);
-                    $steps[] = ['title' => 'Delivered', 'time' => '', 'done' => $delivered];
+                    // 2. Payment Received (Escrow)
+                    $escrow_audit_time = $get_audit_time(['approved payment', 'placed in escrow']);
+                    $escrow_done = !empty($escrow_audit_time) || in_array($order['payment_status'], ['held', 'payout_submitted', 'seller_payment_sent', 'seller_payment_received', 'released', 'refund_submitted', 'refund_sent', 'refund_received', 'refunded']);
+                    $steps[] = [
+                        'title' => 'Payment Received (Escrow)',
+                        'time' => $escrow_audit_time ?: ($escrow_done ? $order['updated_at'] : ''),
+                        'done' => $escrow_done
+                    ];
 
-                    $completed = ($order['order_status'] === 'completed');
-                    $steps[] = ['title' => 'Buyer Confirmed Receipt', 'time' => '', 'done' => $completed];
+                    // 3. Seller Accepted Order
+                    $accepted_audit_time = $get_audit_time(['Order accepted by seller', 'accepted by seller', 'Order accepted']);
+                    $accepted_done = !empty($accepted_audit_time) || in_array($order['order_status'], ['accepted', 'preparing', 'ready_for_shipment', 'out_for_delivery', 'delivered', 'completed']) || ($order['seller_delivered'] == 1) || ($order['buyer_received'] == 1);
+                    $steps[] = [
+                        'title' => 'Seller Accepted Order',
+                        'time' => $accepted_audit_time,
+                        'done' => $accepted_done
+                    ];
 
-                    $released = ($order['payment_status'] === 'released');
-                    $steps[] = ['title' => 'Funds Released to Seller', 'time' => '', 'done' => $released];
+                    // 4. Out for Delivery
+                    $shipped_audit_time = $get_audit_time(['out_for_delivery', 'out for delivery']);
+                    $shipped_done = !empty($shipped_audit_time) || in_array($order['order_status'], ['out_for_delivery', 'delivered', 'completed']) || ($order['seller_delivered'] == 1);
+                    $steps[] = [
+                        'title' => 'Out for Delivery',
+                        'time' => $shipped_audit_time,
+                        'done' => $shipped_done
+                    ];
 
-                    if ($order['order_status'] === 'cancelled') {
-                        $steps[] = ['title' => 'Order Cancelled / Refunded', 'time' => $order['updated_at'], 'done' => true, 'is_danger' => true];
+                    // 5. Delivered
+                    $delivered_audit_time = $get_audit_time(['Seller marked delivered', 'Status changed to delivered', 'delivered']);
+                    $delivered_done = !empty($delivered_audit_time) || in_array($order['order_status'], ['delivered', 'completed']) || ($order['seller_delivered'] == 1);
+                    $steps[] = [
+                        'title' => 'Delivered',
+                        'time' => $delivered_audit_time,
+                        'done' => $delivered_done
+                    ];
+
+                    // 6. Buyer Confirmed Receipt
+                    $buyer_audit_time = $get_audit_time(['Buyer confirmed receipt', 'confirmed receipt']);
+                    $buyer_done = !empty($buyer_audit_time) || ($order['buyer_received'] == 1) || ($order['order_status'] === 'completed');
+                    $steps[] = [
+                        'title' => 'Buyer Confirmed Receipt',
+                        'time' => $buyer_audit_time,
+                        'done' => $buyer_done
+                    ];
+
+                    // 7. Funds Released to Seller
+                    $funds_audit_time = $get_audit_time(['sent payment to seller', 'confirmed payment receipt', 'Funds released']);
+                    $funds_fallback_time = !empty($order['seller_payment_received_at']) ? $order['seller_payment_received_at'] : (!empty($order['seller_payment_sent_at']) ? $order['seller_payment_sent_at'] : (!empty($order['payment_released_at']) ? $order['payment_released_at'] : ''));
+                    $funds_done = !empty($funds_audit_time) || in_array($order['payment_status'], ['seller_payment_sent', 'seller_payment_received', 'released']) || ($order['seller_payment_received'] == 1);
+                    $steps[] = [
+                        'title' => 'Funds Released to Seller',
+                        'time' => $funds_audit_time ?: ($funds_done ? $funds_fallback_time : ''),
+                        'done' => $funds_done
+                    ];
+
+                    // Optional: Cancelled
+                    if ($order['order_status'] === 'cancelled' || in_array($order['payment_status'], ['refunded', 'refund_sent', 'refund_received'])) {
+                        $cancel_audit_time = $get_audit_time(['refunded order', 'cancelled', 'refund']);
+                        $steps[] = [
+                            'title' => 'Order Cancelled / Refunded',
+                            'time' => $cancel_audit_time ?: $order['updated_at'],
+                            'done' => true,
+                            'is_danger' => true
+                        ];
                     }
 
                     foreach ($steps as $step):
@@ -262,7 +338,7 @@ include __DIR__ . '/partials/header.php';
                         <li class="position-relative ps-4 mb-4 <?php echo empty($step['done']) ? 'opacity-50' : ''; ?>">
                             <span class="position-absolute start-0 top-0 translate-middle p-2 rounded-circle <?php echo !empty($step['is_danger']) ? 'bg-danger' : (!empty($step['done']) ? 'bg-primary' : 'bg-secondary'); ?> border border-white border-3"></span>
                             <h6 class="fw-bold mb-1 <?php echo !empty($step['is_danger']) ? 'text-danger' : ''; ?>"><?php echo $step['title']; ?></h6>
-                            <?php if (!empty($step['time'])): ?>
+                            <?php if (!empty($step['time']) && !empty($step['done'])): ?>
                                 <small class="text-muted"><?php echo date('M d, Y h:i A', strtotime($step['time'])); ?></small>
                             <?php endif; ?>
                         </li>
@@ -280,20 +356,7 @@ include __DIR__ . '/partials/header.php';
                 <h5 class="fw-bold mb-0">Audit Logs</h5>
             </div>
             <div class="card-body p-4">
-                <?php
-                $audit_stmt = $conn->prepare("
-                    SELECT a.*, u.first_name, u.last_name, u.role 
-                    FROM order_audits a 
-                    LEFT JOIN users u ON a.user_id = u.id 
-                    WHERE a.order_id = ? 
-                    ORDER BY a.created_at DESC
-                ");
-                $audit_stmt->bind_param("i", $order_id);
-                $audit_stmt->execute();
-                $audits = $audit_stmt->get_result();
-                
-                if ($audits->num_rows > 0):
-                ?>
+                <?php if (!empty($audits_list)): ?>
                     <div class="table-responsive">
                         <table class="table table-sm align-middle small mb-0">
                             <thead>
@@ -305,7 +368,7 @@ include __DIR__ . '/partials/header.php';
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php while($al = $audits->fetch_assoc()): ?>
+                                <?php foreach ($audits_list as $al): ?>
                                     <tr>
                                         <td class="text-nowrap text-muted"><?php echo date('M d, y H:i', strtotime($al['created_at'])); ?></td>
                                         <td class="fw-medium text-dark"><?php echo htmlspecialchars($al['action']); ?></td>
@@ -319,7 +382,7 @@ include __DIR__ . '/partials/header.php';
                                         </td>
                                         <td class="text-muted"><?php echo htmlspecialchars($al['details'] ?? ''); ?></td>
                                     </tr>
-                                <?php endwhile; ?>
+                                <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>

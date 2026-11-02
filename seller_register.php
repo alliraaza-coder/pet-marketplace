@@ -107,11 +107,21 @@ include 'includes/header.php';
                         <div class="row mb-4">
                             <div class="col-md-6">
                                 <label for="password" class="form-label fw-medium">Password <span class="text-danger">*</span></label>
-                                <input type="password" class="form-control" id="password" name="password" required minlength="8">
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="password" name="password" required minlength="8">
+                                    <button type="button" class="btn btn-outline-secondary border-start-0 px-3" style="cursor:pointer" onclick="togglePassword('password', this)" title="Show/Hide Password">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div class="col-md-6 mt-3 mt-md-0">
                                 <label for="confirm_password" class="form-label fw-medium">Confirm Password <span class="text-danger">*</span></label>
-                                <input type="password" class="form-control" id="confirm_password" name="confirm_password" required minlength="8">
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="confirm_password" name="confirm_password" required minlength="8">
+                                    <button type="button" class="btn btn-outline-secondary border-start-0 px-3" style="cursor:pointer" onclick="togglePassword('confirm_password', this)" title="Show/Hide Password">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         

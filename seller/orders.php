@@ -106,18 +106,50 @@ include '../includes/header.php';
                 </div>
             </div>
 
-            <!-- Status Filter Tabs -->
+            <!-- Status Filter Tabs with Live Counts -->
+            <?php
+            $sc_stmt = $conn->prepare(
+                "SELECT o.order_status, COUNT(DISTINCT o.id) AS cnt
+                 FROM orders o
+                 JOIN order_items oi ON oi.order_id = o.id
+                 WHERE oi.seller_id = ? AND o.payment_status NOT IN ('pending', 'payment_submitted', 'rejected')
+                 GROUP BY o.order_status"
+            );
+            $sc_stmt->bind_param('i', $seller_id);
+            $sc_stmt->execute();
+            $sc_res = $sc_stmt->get_result();
+            $sc_map = [];
+            $total_seller_all_orders = 0;
+            while ($sc_row = $sc_res->fetch_assoc()) {
+                $sc_map[$sc_row['order_status']] = (int)$sc_row['cnt'];
+                $total_seller_all_orders += (int)$sc_row['cnt'];
+            }
+
+            $tab_opts = [
+                ''                   => 'All',
+                'pending'            => 'Pending',
+                'accepted'           => 'Accepted',
+                'preparing'          => 'Preparing',
+                'ready_for_shipment' => 'Ready',
+                'out_for_delivery'   => 'Shipping',
+                'delivered'          => 'Delivered',
+                'completed'          => 'Completed',
+                'cancelled'          => 'Cancelled'
+            ];
+            ?>
             <div class="d-flex gap-2 mb-3 flex-wrap">
                 <?php
-                $tab_opts = ['' => 'All', 'pending' => 'Pending', 'accepted' => 'Accepted',
-                             'preparing' => 'Preparing', 'ready_for_shipment' => 'Ready', 'out_for_delivery' => 'Shipping', 'delivered' => 'Delivered', 'completed' => 'Completed', 'cancelled' => 'Cancelled'];
                 foreach ($tab_opts as $val => $lbl):
                     $qs       = http_build_query(['q' => $search, 'status' => $val]);
                     $is_act   = ($filter_status === $val);
+                    $count_val = ($val === '') ? $total_seller_all_orders : ($sc_map[$val] ?? 0);
                 ?>
                 <a href="orders.php?<?php echo $qs; ?>"
-                   class="btn btn-sm rounded-pill <?php echo $is_act ? 'btn-dark' : 'btn-outline-secondary'; ?>">
-                    <?php echo $lbl; ?>
+                   class="btn btn-sm rounded-pill d-inline-flex align-items-center gap-2 <?php echo $is_act ? 'btn-dark' : 'btn-outline-secondary'; ?>">
+                    <span><?php echo $lbl; ?></span>
+                    <span class="badge <?php echo $is_act ? 'bg-light text-dark' : 'bg-secondary bg-opacity-25 text-dark'; ?> rounded-pill" style="font-size:0.7rem;">
+                        <?php echo $count_val; ?>
+                    </span>
                 </a>
                 <?php endforeach; ?>
             </div>
@@ -160,7 +192,8 @@ include '../includes/header.php';
                                 <?php
                                     // Fetch items belonging to this seller for this order
                                     $items_stmt = $conn->prepare(
-                                        "SELECT oi.quantity, p.title_en
+                                        "SELECT oi.quantity, p.id as product_id, p.title_en,
+                                                (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.id AND pi.is_primary = 1 LIMIT 1) as image_url
                                          FROM order_items oi
                                          JOIN products p ON oi.product_id = p.id
                                          WHERE oi.order_id = ? AND oi.seller_id = ?"
@@ -180,7 +213,14 @@ include '../includes/header.php';
                                     </td>
                                     <td>
                                         <?php foreach ($items as $it): ?>
-                                            <div class="small"><i class="bi bi-dot text-success"></i> <?php echo $it['quantity']; ?>× <?php echo htmlspecialchars($it['title_en']); ?></div>
+                                            <?php $s_img = !empty($it['image_url']) ? BASE_URL . '/assets/uploads/products/' . htmlspecialchars($it['image_url']) : get_product_image_url($conn, $it['product_id']); ?>
+                                            <div class="d-flex align-items-center gap-2 mb-1">
+                                                <img src="<?php echo $s_img; ?>" class="rounded border object-fit-cover flex-shrink-0" style="width: 36px; height: 36px;" onerror="this.src='https://placehold.co/36x36?text=Pet';">
+                                                <div class="small">
+                                                    <span class="fw-semibold text-dark"><?php echo htmlspecialchars($it['title_en']); ?></span>
+                                                    <span class="text-muted"> &times;<?php echo $it['quantity']; ?></span>
+                                                </div>
+                                            </div>
                                         <?php endforeach; ?>
                                     </td>
                                     <td>

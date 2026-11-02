@@ -99,7 +99,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                         <div class="mb-4">
                             <label for="password" class="form-label text-muted">Password</label>
-                            <input type="password" class="form-control bg-dark text-white border-secondary" id="password" name="password" required>
+                            <div class="input-group">
+                                <input type="password" class="form-control bg-dark text-white border-secondary" id="password" name="password" required>
+                                <button type="button" class="btn btn-outline-secondary border-start-0 px-3" style="cursor:pointer" onclick="togglePassword('password', this)" title="Show/Hide Password">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="d-grid">
                             <button type="submit" class="btn btn-danger fw-bold py-2">Secure Login</button>

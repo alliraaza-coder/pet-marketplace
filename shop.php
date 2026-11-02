@@ -204,20 +204,24 @@ include 'includes/header.php';
                             <ul class="list-unstyled mb-0">
                                 <li class="mb-2">
                                     <div class="form-check">
-                                        <input class="form-check-input text-success" type="radio" name="category" id="cat_all" value="" <?php echo empty($category) ? 'checked' : ''; ?> onchange="document.getElementById('filterForm').submit()">
+                                        <input class="form-check-input text-success" type="radio" name="category" id="cat_all" value="" <?php echo empty($category) ? 'checked' : ''; ?> onchange="clearSubcategoryAndSubmit()">
                                         <label class="form-check-label" for="cat_all">All Categories</label>
                                     </div>
                                 </li>
                                 <?php if ($cat_result) while($cat = $cat_result->fetch_assoc()): ?>
                                 <li class="mb-2">
                                     <div class="form-check">
+                                        <?php if ($cat['slug'] === 'birds-animals'): ?>
                                         <input class="form-check-input text-success" type="radio" name="category" id="cat_<?php echo $cat['id']; ?>" value="<?php echo $cat['slug']; ?>" <?php echo $category === $cat['slug'] ? 'checked' : ''; ?> onchange="document.getElementById('filterForm').submit()">
+                                        <?php else: ?>
+                                        <input class="form-check-input text-success" type="radio" name="category" id="cat_<?php echo $cat['id']; ?>" value="<?php echo $cat['slug']; ?>" <?php echo $category === $cat['slug'] ? 'checked' : ''; ?> onchange="clearSubcategoryAndSubmit()">
+                                        <?php endif; ?>
                                         <label class="form-check-label" for="cat_<?php echo $cat['id']; ?>"><?php echo htmlspecialchars($cat['name_en']); ?></label>
                                     </div>
                                     <?php if ($cat['slug'] === 'birds-animals' && $category === 'birds-animals' && $subcats_for_birds && $subcats_for_birds->num_rows > 0): ?>
-                                    <div class="ms-3 ps-2 border-start mt-2 mb-2">
+                                    <div class="ms-3 ps-2 border-start mt-2 mb-2" id="subcategoryPanel">
                                         <div class="form-check mb-1">
-                                            <input class="form-check-input text-success" type="radio" name="subcategory" id="sub_all" value="" <?php echo empty($subcategory) ? 'checked' : ''; ?> onchange="document.getElementById('filterForm').submit()">
+                                            <input class="form-check-input text-success subcat-radio" type="radio" name="subcategory" id="sub_all" value="" <?php echo empty($subcategory) ? 'checked' : ''; ?> onchange="document.getElementById('filterForm').submit()">
                                             <label class="form-check-label small text-muted" for="sub_all">All Birds &amp; Animals</label>
                                         </div>
                                         <?php 
@@ -225,7 +229,7 @@ include 'includes/header.php';
                                         while($sub = $subcats_for_birds->fetch_assoc()): 
                                         ?>
                                         <div class="form-check mb-1">
-                                            <input class="form-check-input text-success" type="radio" name="subcategory" id="sub_<?php echo $sub['id']; ?>" value="<?php echo $sub['slug']; ?>" <?php echo $subcategory === $sub['slug'] ? 'checked' : ''; ?> onchange="document.getElementById('filterForm').submit()">
+                                            <input class="form-check-input text-success subcat-radio" type="radio" name="subcategory" id="sub_<?php echo $sub['id']; ?>" value="<?php echo $sub['slug']; ?>" <?php echo $subcategory === $sub['slug'] ? 'checked' : ''; ?> onchange="document.getElementById('filterForm').submit()">
                                             <label class="form-check-label small" for="sub_<?php echo $sub['id']; ?>"><?php echo htmlspecialchars($sub['name_en']); ?></label>
                                         </div>
                                         <?php endwhile; ?>
@@ -402,4 +406,23 @@ include 'includes/header.php';
     </div>
 </div>
 
+
 <?php include 'includes/footer.php'; ?>
+
+<script>
+/**
+ * Called when ANY category other than "birds-animals" is selected.
+ * Disables all subcategory radios before submit so their value is
+ * NOT sent — preventing the old subcategory (e.g. "birds") from
+ * being applied when the user switches to Cages & Houses, etc.
+ */
+function clearSubcategoryAndSubmit() {
+    // Disable every subcategory radio so the browser won't include
+    // any "subcategory" key in the GET request at all.
+    var subcatRadios = document.querySelectorAll('input[name="subcategory"]');
+    subcatRadios.forEach(function(radio) {
+        radio.disabled = true;
+    });
+    document.getElementById('filterForm').submit();
+}
+</script>

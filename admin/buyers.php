@@ -11,6 +11,7 @@ $admin_id = $_SESSION['user_id'];
 
 // Handle Actions (Activate, Deactivate, Delete)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['buyer_id'])) {
+    verify_csrf();
     $action   = sanitize_input($_POST['action']);
     $buyer_id = (int)$_POST['buyer_id'];
 
@@ -168,6 +169,7 @@ $buyers = $stmt->get_result();
                                             <?php if ($b['status'] === 'active'): ?>
                                                 <li>
                                                     <form action="buyers.php" method="POST" class="d-inline">
+                                                        <?php csrf_field(); ?>
                                                         <input type="hidden" name="action" value="deactivate">
                                                         <input type="hidden" name="buyer_id" value="<?php echo $b['id']; ?>">
                                                         <button type="submit" class="dropdown-item text-warning" onclick="return confirm('Deactivate this buyer account?');"><i class="bi bi-pause-circle me-2"></i> Deactivate Account</button>
@@ -176,6 +178,7 @@ $buyers = $stmt->get_result();
                                             <?php else: ?>
                                                 <li>
                                                     <form action="buyers.php" method="POST" class="d-inline">
+                                                        <?php csrf_field(); ?>
                                                         <input type="hidden" name="action" value="activate">
                                                         <input type="hidden" name="buyer_id" value="<?php echo $b['id']; ?>">
                                                         <button type="submit" class="dropdown-item text-success"><i class="bi bi-check-circle me-2"></i> Activate Account</button>
@@ -184,6 +187,7 @@ $buyers = $stmt->get_result();
                                             <?php endif; ?>
                                             <li>
                                                 <form action="buyers.php" method="POST" class="d-inline">
+                                                    <?php csrf_field(); ?>
                                                     <input type="hidden" name="action" value="delete">
                                                     <input type="hidden" name="buyer_id" value="<?php echo $b['id']; ?>">
                                                     <button type="submit" class="dropdown-item text-danger" onclick="return confirm('Are you sure you want to delete this buyer?');"><i class="bi bi-trash me-2"></i> Delete</button>
