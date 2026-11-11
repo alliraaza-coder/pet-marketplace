@@ -198,12 +198,131 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['workflow_action'])) {
                 $_SESSION['error'] = "Failed to accept order: " . $e->getMessage();
             }
         }
+    } elseif ($action === 'ship') {
+        // Enforce vehicle details and 3 mandatory photos before marking out_for_delivery
+        if ($order['order_status'] !== 'ready_for_shipment') {
+            $_SESSION['error'] = "Order must be in 'Ready for Shipment' status before it can be marked 'Out for Delivery'.";
+            header("Location: order_details.php?id=$order_id");
+            exit;
+        }
+
+        $vehicle_number       = sanitize_input($_POST['vehicle_number'] ?? '');
+        $vehicle_owner_number = sanitize_input($_POST['vehicle_owner_number'] ?? '');
+
+        if (empty($vehicle_number) || empty($vehicle_owner_number)) {
+            $_SESSION['error'] = "Vehicle Number and Vehicle Owner/Driver Contact Number are strictly compulsory to mark Out for Delivery.";
+            header("Location: order_details.php?id=$order_id");
+            exit;
+        }
+
+        // Validate 3 compulsory photos
+        $required_photos = [
+            'delivery_proof_packed'  => 'Photo 1: Packed Product / Pet Carrier',
+            'delivery_proof_loaded'  => 'Photo 2: Product Loaded in Vehicle',
+            'delivery_proof_vehicle' => 'Photo 3: Delivery Vehicle / Cargo'
+        ];
+
+        $uploaded_filenames = [];
+        $allowed_exts  = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+        $allowed_mimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        $upload_dir    = '../assets/images/delivery/';
+        if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+
+        $validation_errors = [];
+
+        foreach ($required_photos as $field_key => $field_label) {
+            if (!isset($_FILES[$field_key]) || $_FILES[$field_key]['error'] !== UPLOAD_ERR_OK) {
+                $validation_errors[] = "$field_label is mandatory.";
+                continue;
+            }
+
+            $tmp_path  = $_FILES[$field_key]['tmp_name'];
+            $orig_name = $_FILES[$field_key]['name'];
+            $ext       = strtolower(pathinfo($orig_name, PATHINFO_EXTENSION));
+
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime  = finfo_file($finfo, $tmp_path);
+            finfo_close($finfo);
+
+            if (!in_array($ext, $allowed_exts) || !in_array($mime, $allowed_mimes)) {
+                $validation_errors[] = "$field_label must be a valid image file (JPG, PNG, or WEBP).";
+                continue;
+            }
+
+            if ($_FILES[$field_key]['size'] > 5 * 1024 * 1024) {
+                $validation_errors[] = "$field_label size exceeds the 5MB limit.";
+                continue;
+            }
+
+            $prefix = str_replace('delivery_proof_', '', $field_key);
+            $new_name = $prefix . "_{$order_id}_" . time() . "_" . bin2hex(random_bytes(4)) . "." . $ext;
+            if (move_uploaded_file($tmp_path, $upload_dir . $new_name)) {
+                $uploaded_filenames[$field_key] = $new_name;
+            } else {
+                $validation_errors[] = "Failed to upload $field_label.";
+            }
+        }
+
+        if (!empty($validation_errors)) {
+            foreach ($uploaded_filenames as $fl) {
+                @unlink($upload_dir . $fl);
+            }
+            $_SESSION['error'] = implode("<br>", $validation_errors);
+            header("Location: order_details.php?id=$order_id");
+            exit;
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $upd_stmt = $conn->prepare("
+            UPDATE orders 
+            SET order_status = 'out_for_delivery',
+                vehicle_number = ?,
+                vehicle_owner_number = ?,
+                delivery_proof_packed = ?,
+                delivery_proof_loaded = ?,
+                delivery_proof_vehicle = ?,
+                delivery_dispatched_at = ?
+            WHERE id = ?
+        ");
+        $upd_stmt->bind_param(
+            "ssssssi",
+            $vehicle_number,
+            $vehicle_owner_number,
+            $uploaded_filenames['delivery_proof_packed'],
+            $uploaded_filenames['delivery_proof_loaded'],
+            $uploaded_filenames['delivery_proof_vehicle'],
+            $now,
+            $order_id
+        );
+
+        if ($upd_stmt->execute()) {
+            $_SESSION['success'] = "Order is now Out for Delivery! Vehicle details and dispatch verification photos recorded successfully.";
+            if (function_exists('log_order_audit')) {
+                log_order_audit($conn, $order_id, "Order marked Out for Delivery", "Vehicle: $vehicle_number | Driver: $vehicle_owner_number", $seller_id);
+            }
+            if (function_exists('add_user_notification')) {
+                $msg = "Your order #{$order['order_number']} is now Out for Delivery! Dispatched via Vehicle #{$vehicle_number} (Driver/Owner: {$vehicle_owner_number}).";
+                add_user_notification($conn, $order['user_id'], 'order_update', 'Order Out for Delivery', $msg, 'user/order_details.php?id=' . $order_id);
+            }
+            $order['order_status'] = 'out_for_delivery';
+            $order['vehicle_number'] = $vehicle_number;
+            $order['vehicle_owner_number'] = $vehicle_owner_number;
+            $order['delivery_proof_packed'] = $uploaded_filenames['delivery_proof_packed'];
+            $order['delivery_proof_loaded'] = $uploaded_filenames['delivery_proof_loaded'];
+            $order['delivery_proof_vehicle'] = $uploaded_filenames['delivery_proof_vehicle'];
+            $order['delivery_dispatched_at'] = $now;
+            header("Location: order_details.php?id=$order_id");
+            exit;
+        } else {
+            $_SESSION['error'] = "Database update failed: " . $conn->error;
+            header("Location: order_details.php?id=$order_id");
+            exit;
+        }
     } else {
         $new_status = '';
         switch ($action) {
             case 'prepare': $new_status = 'preparing'; break;
             case 'ready': $new_status = 'ready_for_shipment'; break;
-            case 'ship': $new_status = 'out_for_delivery'; break;
             case 'deliver': $new_status = 'delivered'; break;
             case 'cancel': $new_status = 'cancelled'; break;
         }
@@ -289,7 +408,9 @@ include '../includes/header.php';
                             <?php elseif ($order['order_status'] === 'preparing'): ?>
                                 <button type="submit" name="workflow_action" value="ready" class="btn btn-warning text-dark fw-bold">Ready for Shipment</button>
                             <?php elseif ($order['order_status'] === 'ready_for_shipment'): ?>
-                                <button type="submit" name="workflow_action" value="ship" class="btn btn-primary fw-bold">Out for Delivery</button>
+                                <button type="button" class="btn btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#dispatchModal">
+                                    <i class="bi bi-truck me-2"></i>Out for Delivery
+                                </button>
                             <?php elseif ($order['order_status'] === 'out_for_delivery'): ?>
                                 <button type="submit" name="workflow_action" value="deliver" class="btn btn-success fw-bold" onclick="return confirm('Confirm you have delivered the bird?');">Mark Bird Delivered</button>
                             <?php endif; ?>
@@ -315,6 +436,112 @@ include '../includes/header.php';
                     <?php endif; ?>
                 </div>
             </div>
+
+            <!-- Vehicle & Dispatch Proofs Card (When Dispatched) -->
+            <?php if (!empty($order['vehicle_number'])): ?>
+            <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+                <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="fw-bold mb-0 text-primary">
+                        <i class="bi bi-truck me-2"></i>Vehicle & Dispatch Proofs
+                    </h5>
+                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-3 py-2">
+                        <i class="bi bi-patch-check-fill me-1"></i> Dispatched via Registered Vehicle
+                    </span>
+                </div>
+                <div class="card-body p-4">
+                    <!-- Vehicle Info Strip -->
+                    <div class="p-3 bg-light rounded-4 border mb-4">
+                        <div class="row g-3 align-items-center text-center text-md-start">
+                            <div class="col-12 col-md-4">
+                                <small class="text-muted d-block" style="font-size: 0.75rem;"><i class="bi bi-123 text-primary me-1"></i>Vehicle / Cargo Number</small>
+                                <span class="fw-bold font-monospace fs-6 text-dark d-inline-block bg-white px-3 py-1 rounded-pill border mt-1 shadow-sm">
+                                    <?php echo htmlspecialchars($order['vehicle_number']); ?>
+                                </span>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <small class="text-muted d-block" style="font-size: 0.75rem;"><i class="bi bi-telephone-fill text-success me-1"></i>Driver / Owner Contact</small>
+                                <a href="tel:<?php echo htmlspecialchars($order['vehicle_owner_number']); ?>" class="btn btn-sm btn-outline-success rounded-pill px-3 py-1 mt-1 fw-bold">
+                                    <i class="bi bi-telephone-outbound me-1"></i><?php echo htmlspecialchars($order['vehicle_owner_number']); ?>
+                                </a>
+                            </div>
+                            <div class="col-12 col-md-4 text-md-end">
+                                <small class="text-muted d-block" style="font-size: 0.75rem;"><i class="bi bi-clock-history me-1"></i>Dispatched At</small>
+                                <span class="text-dark small fw-semibold">
+                                    <?php echo !empty($order['delivery_dispatched_at']) ? date('d M Y, h:i A', strtotime($order['delivery_dispatched_at'])) : date('d M Y, h:i A', strtotime($order['updated_at'])); ?>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3 Proof Photos Grid -->
+                    <h6 class="fw-bold mb-3 text-dark small text-uppercase"><i class="bi bi-images me-1 text-primary"></i> Verification Photos Submitted</h6>
+                    <div class="row g-3">
+                        <!-- Proof 1: Packed Product -->
+                        <div class="col-12 col-sm-6 col-md-4">
+                            <div class="card h-100 border rounded-3 p-2 text-center bg-white shadow-sm position-relative">
+                                <span class="badge bg-primary bg-opacity-10 text-primary small py-1 px-2 rounded-pill mb-2 fw-semibold">1. Packed Product / Pet</span>
+                                <div class="ratio ratio-4x3 rounded-3 overflow-hidden border bg-light mb-2">
+                                    <?php if (!empty($order['delivery_proof_packed'])): ?>
+                                        <img src="<?php echo BASE_URL; ?>/assets/images/delivery/<?php echo htmlspecialchars($order['delivery_proof_packed']); ?>" 
+                                             class="img-fluid object-fit-cover w-100 h-100 cursor-pointer proof-thumb" 
+                                             alt="Packed Product Proof"
+                                             onclick="showProofModal(this.src, 'Packed Product / Pet Proof')"
+                                             onerror="this.src='https://placehold.co/300x225?text=Packed+Proof';">
+                                    <?php else: ?>
+                                        <div class="d-flex align-items-center justify-content-center text-muted small">No Image</div>
+                                    <?php endif; ?>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-light border rounded-pill w-100 small" onclick="showProofModal('<?php echo BASE_URL; ?>/assets/images/delivery/<?php echo htmlspecialchars($order['delivery_proof_packed']); ?>', 'Packed Product / Pet Proof')">
+                                    <i class="bi bi-zoom-in me-1 text-primary"></i> View Photo
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Proof 2: Loaded in Vehicle -->
+                        <div class="col-12 col-sm-6 col-md-4">
+                            <div class="card h-100 border rounded-3 p-2 text-center bg-white shadow-sm position-relative">
+                                <span class="badge bg-success bg-opacity-10 text-success small py-1 px-2 rounded-pill mb-2 fw-semibold">2. Loaded in Vehicle</span>
+                                <div class="ratio ratio-4x3 rounded-3 overflow-hidden border bg-light mb-2">
+                                    <?php if (!empty($order['delivery_proof_loaded'])): ?>
+                                        <img src="<?php echo BASE_URL; ?>/assets/images/delivery/<?php echo htmlspecialchars($order['delivery_proof_loaded']); ?>" 
+                                             class="img-fluid object-fit-cover w-100 h-100 cursor-pointer proof-thumb" 
+                                             alt="Loaded in Vehicle Proof"
+                                             onclick="showProofModal(this.src, 'Product Loaded in Vehicle Proof')"
+                                             onerror="this.src='https://placehold.co/300x225?text=Loaded+Proof';">
+                                    <?php else: ?>
+                                        <div class="d-flex align-items-center justify-content-center text-muted small">No Image</div>
+                                    <?php endif; ?>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-light border rounded-pill w-100 small" onclick="showProofModal('<?php echo BASE_URL; ?>/assets/images/delivery/<?php echo htmlspecialchars($order['delivery_proof_loaded']); ?>', 'Product Loaded in Vehicle Proof')">
+                                    <i class="bi bi-zoom-in me-1 text-success"></i> View Photo
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Proof 3: Delivery Vehicle -->
+                        <div class="col-12 col-sm-6 col-md-4">
+                            <div class="card h-100 border rounded-3 p-2 text-center bg-white shadow-sm position-relative">
+                                <span class="badge bg-info bg-opacity-10 text-info small py-1 px-2 rounded-pill mb-2 fw-semibold">3. Transport Vehicle</span>
+                                <div class="ratio ratio-4x3 rounded-3 overflow-hidden border bg-light mb-2">
+                                    <?php if (!empty($order['delivery_proof_vehicle'])): ?>
+                                        <img src="<?php echo BASE_URL; ?>/assets/images/delivery/<?php echo htmlspecialchars($order['delivery_proof_vehicle']); ?>" 
+                                             class="img-fluid object-fit-cover w-100 h-100 cursor-pointer proof-thumb" 
+                                             alt="Delivery Vehicle Proof"
+                                             onclick="showProofModal(this.src, 'Delivery Vehicle / Cargo Proof')"
+                                             onerror="this.src='https://placehold.co/300x225?text=Vehicle+Proof';">
+                                    <?php else: ?>
+                                        <div class="d-flex align-items-center justify-content-center text-muted small">No Image</div>
+                                    <?php endif; ?>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-light border rounded-pill w-100 small" onclick="showProofModal('<?php echo BASE_URL; ?>/assets/images/delivery/<?php echo htmlspecialchars($order['delivery_proof_vehicle']); ?>', 'Delivery Vehicle / Cargo Proof')">
+                                    <i class="bi bi-zoom-in me-1 text-info"></i> View Photo
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <!-- Seller Payment Card -->
             <?php if (in_array($order['payment_status'], ['seller_payment_sent', 'seller_payment_received']) || $order['seller_payment_received'] == 1): ?>
@@ -426,5 +653,125 @@ include '../includes/header.php';
         </div>
     </div>
 </div>
+
+<!-- Out for Delivery: Vehicle & Dispatch Modal -->
+<div class="modal fade" id="dispatchModal" tabindex="-1" aria-labelledby="dispatchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <form action="" method="POST" enctype="multipart/form-data">
+                <?php csrf_field(); ?>
+                <input type="hidden" name="workflow_action" value="ship">
+                
+                <div class="modal-header bg-primary text-white border-0 py-3 px-4">
+                    <h5 class="modal-title fw-bold" id="dispatchModalLabel">
+                        <i class="bi bi-truck me-2"></i>Out for Delivery - Vehicle & Dispatch Proofs
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                
+                <div class="modal-body p-4">
+                    <div class="alert alert-warning border-0 rounded-3 d-flex align-items-center mb-4 p-3">
+                        <i class="bi bi-shield-exclamation fs-3 text-warning me-3 flex-shrink-0"></i>
+                        <div class="small">
+                            <strong>Mandatory Delivery Verification:</strong> You must enter vehicle details and upload all 3 photos (packaging, loaded in vehicle, and transport vehicle). This information is compulsory before this order can be marked Out for Delivery.
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark"><i class="bi bi-123 me-1 text-primary"></i> Vehicle / Cargo Number <span class="text-danger">*</span></label>
+                            <input type="text" name="vehicle_number" class="form-control rounded-3" placeholder="e.g. LEA-2024 / Courier Van / Suzuki Bolan" required>
+                            <small class="text-muted" style="font-size:0.75rem;">Vehicle registration number or transport cargo details.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark"><i class="bi bi-telephone-fill me-1 text-success"></i> Vehicle Owner / Driver Phone <span class="text-danger">*</span></label>
+                            <input type="tel" name="vehicle_owner_number" class="form-control rounded-3" placeholder="e.g. 0300-1234567" required>
+                            <small class="text-muted" style="font-size:0.75rem;">Contact number of driver or cargo rider delivering the pet.</small>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold mb-3 text-dark border-bottom pb-2"><i class="bi bi-camera-fill text-primary me-2"></i>Compulsory Verification Photos (All 3 Required)</h6>
+                    
+                    <div class="row g-3">
+                        <!-- Photo 1: Packed Product -->
+                        <div class="col-12 col-md-4">
+                            <div class="card h-100 border rounded-3 p-3 text-center bg-light">
+                                <i class="bi bi-box2-heart text-primary fs-2 mb-2"></i>
+                                <span class="fw-bold small d-block mb-1 text-dark">1. Packed Product / Pet <span class="text-danger">*</span></span>
+                                <small class="text-muted d-block mb-2" style="font-size:0.72rem;">Safe cage / travel box</small>
+                                <input type="file" name="delivery_proof_packed" class="form-control form-control-sm" accept="image/*" required onchange="previewDispatchImg(this, 'previewPacked')">
+                                <img id="previewPacked" class="img-thumbnail mt-2 d-none rounded-3 mx-auto" style="max-height: 90px; width: auto; object-fit: cover;">
+                            </div>
+                        </div>
+
+                        <!-- Photo 2: Loaded in Vehicle -->
+                        <div class="col-12 col-md-4">
+                            <div class="card h-100 border rounded-3 p-3 text-center bg-light">
+                                <i class="bi bi-box-arrow-in-down-right text-success fs-2 mb-2"></i>
+                                <span class="fw-bold small d-block mb-1 text-dark">2. Loaded in Vehicle <span class="text-danger">*</span></span>
+                                <small class="text-muted d-block mb-2" style="font-size:0.72rem;">Package placed inside vehicle</small>
+                                <input type="file" name="delivery_proof_loaded" class="form-control form-control-sm" accept="image/*" required onchange="previewDispatchImg(this, 'previewLoaded')">
+                                <img id="previewLoaded" class="img-thumbnail mt-2 d-none rounded-3 mx-auto" style="max-height: 90px; width: auto; object-fit: cover;">
+                            </div>
+                        </div>
+
+                        <!-- Photo 3: Vehicle / Cargo Image -->
+                        <div class="col-12 col-md-4">
+                            <div class="card h-100 border rounded-3 p-3 text-center bg-light">
+                                <i class="bi bi-truck-front text-info fs-2 mb-2"></i>
+                                <span class="fw-bold small d-block mb-1 text-dark">3. Delivery Vehicle <span class="text-danger">*</span></span>
+                                <small class="text-muted d-block mb-2" style="font-size:0.72rem;">Vehicle showing number plate</small>
+                                <input type="file" name="delivery_proof_vehicle" class="form-control form-control-sm" accept="image/*" required onchange="previewDispatchImg(this, 'previewVehicle')">
+                                <img id="previewVehicle" class="img-thumbnail mt-2 d-none rounded-3 mx-auto" style="max-height: 90px; width: auto; object-fit: cover;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer border-0 bg-light py-3 px-4">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">
+                        <i class="bi bi-check2-circle me-1"></i>Confirm Out for Delivery
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Fullscreen Proof Image Modal -->
+<div class="modal fade" id="proofViewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header py-3 px-4 border-0 bg-dark text-white">
+                <h6 class="modal-title fw-bold mb-0" id="proofModalTitle"><i class="bi bi-image me-2"></i>Dispatch Proof Photo</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0 text-center bg-black">
+                <img id="proofModalImg" src="" class="img-fluid" style="max-height: 80vh; width: auto; object-fit: contain;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showProofModal(src, title) {
+    document.getElementById('proofModalImg').src = src;
+    document.getElementById('proofModalTitle').innerHTML = '<i class="bi bi-image me-2"></i>' + title;
+    var modal = new bootstrap.Modal(document.getElementById('proofViewModal'));
+    modal.show();
+}
+function previewDispatchImg(input, targetId) {
+    if (input.files && input.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var img = document.getElementById(targetId);
+            img.src = e.target.result;
+            img.classList.remove('d-none');
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+</script>
 
 <?php include '../includes/footer.php'; ?>

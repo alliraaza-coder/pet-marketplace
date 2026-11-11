@@ -149,6 +149,112 @@ include __DIR__ . '/partials/header.php';
             </div>
         </div>
 
+        <!-- Vehicle & Dispatch Proofs Card (Admin Side) -->
+        <?php if (!empty($order['vehicle_number'])): ?>
+        <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+            <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="fw-bold mb-0 text-primary">
+                    <i class="bi bi-truck me-2"></i>Delivery Vehicle & Cargo Dispatch Proofs
+                </h5>
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-3 py-2">
+                    <i class="bi bi-patch-check-fill me-1"></i> Dispatched via Registered Vehicle
+                </span>
+            </div>
+            <div class="card-body p-4">
+                <!-- Vehicle & Driver Strip -->
+                <div class="p-3 bg-light rounded-4 border mb-4">
+                    <div class="row g-3 align-items-center text-center text-md-start">
+                        <div class="col-12 col-md-4">
+                            <small class="text-muted d-block" style="font-size: 0.75rem;"><i class="bi bi-123 text-primary me-1"></i>Vehicle / Cargo Number</small>
+                            <span class="fw-bold font-monospace fs-6 text-dark d-inline-block bg-white px-3 py-1 rounded-pill border mt-1 shadow-sm">
+                                <?php echo htmlspecialchars($order['vehicle_number']); ?>
+                            </span>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <small class="text-muted d-block" style="font-size: 0.75rem;"><i class="bi bi-telephone-fill text-success me-1"></i>Driver / Owner Contact</small>
+                            <a href="tel:<?php echo htmlspecialchars($order['vehicle_owner_number']); ?>" class="btn btn-sm btn-outline-success rounded-pill px-3 py-1 mt-1 fw-bold">
+                                <i class="bi bi-telephone-outbound me-1"></i><?php echo htmlspecialchars($order['vehicle_owner_number']); ?>
+                            </a>
+                        </div>
+                        <div class="col-12 col-md-4 text-md-end">
+                            <small class="text-muted d-block" style="font-size: 0.75rem;"><i class="bi bi-clock-history me-1"></i>Dispatched At</small>
+                            <span class="text-dark small fw-semibold">
+                                <?php echo !empty($order['delivery_dispatched_at']) ? date('d M Y, h:i A', strtotime($order['delivery_dispatched_at'])) : date('d M Y, h:i A', strtotime($order['updated_at'])); ?>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3 Verification Photos Grid -->
+                <h6 class="fw-bold mb-3 text-dark small text-uppercase"><i class="bi bi-images me-1 text-primary"></i> Verification Photos Submitted by Seller</h6>
+                <div class="row g-3">
+                    <!-- Proof 1: Packed Product -->
+                    <div class="col-12 col-sm-6 col-md-4">
+                        <div class="card h-100 border rounded-3 p-2 text-center bg-white shadow-sm position-relative">
+                            <span class="badge bg-primary bg-opacity-10 text-primary small py-1 px-2 rounded-pill mb-2 fw-semibold">1. Packed Product / Pet</span>
+                            <div class="ratio ratio-4x3 rounded-3 overflow-hidden border bg-light mb-2">
+                                <?php if (!empty($order['delivery_proof_packed'])): ?>
+                                    <img src="<?php echo BASE_URL; ?>/assets/images/delivery/<?php echo htmlspecialchars($order['delivery_proof_packed']); ?>" 
+                                         class="img-fluid object-fit-cover w-100 h-100 cursor-pointer proof-thumb" 
+                                         alt="Packed Product Proof"
+                                         onclick="showProofModal(this.src, 'Packed Product / Pet Proof')"
+                                         onerror="this.src='https://placehold.co/300x225?text=Packed+Proof';">
+                                <?php else: ?>
+                                    <div class="d-flex align-items-center justify-content-center text-muted small">No Image</div>
+                                <?php endif; ?>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-light border rounded-pill w-100 small" onclick="showProofModal('<?php echo BASE_URL; ?>/assets/images/delivery/<?php echo htmlspecialchars($order['delivery_proof_packed']); ?>', 'Packed Product / Pet Proof')">
+                                <i class="bi bi-zoom-in me-1 text-primary"></i> View Photo
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Proof 2: Loaded in Vehicle -->
+                    <div class="col-12 col-sm-6 col-md-4">
+                        <div class="card h-100 border rounded-3 p-2 text-center bg-white shadow-sm position-relative">
+                            <span class="badge bg-success bg-opacity-10 text-success small py-1 px-2 rounded-pill mb-2 fw-semibold">2. Loaded in Vehicle</span>
+                            <div class="ratio ratio-4x3 rounded-3 overflow-hidden border bg-light mb-2">
+                                <?php if (!empty($order['delivery_proof_loaded'])): ?>
+                                    <img src="<?php echo BASE_URL; ?>/assets/images/delivery/<?php echo htmlspecialchars($order['delivery_proof_loaded']); ?>" 
+                                         class="img-fluid object-fit-cover w-100 h-100 cursor-pointer proof-thumb" 
+                                         alt="Loaded in Vehicle Proof"
+                                         onclick="showProofModal(this.src, 'Product Loaded in Vehicle Proof')"
+                                         onerror="this.src='https://placehold.co/300x225?text=Loaded+Proof';">
+                                <?php else: ?>
+                                    <div class="d-flex align-items-center justify-content-center text-muted small">No Image</div>
+                                <?php endif; ?>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-light border rounded-pill w-100 small" onclick="showProofModal('<?php echo BASE_URL; ?>/assets/images/delivery/<?php echo htmlspecialchars($order['delivery_proof_loaded']); ?>', 'Product Loaded in Vehicle Proof')">
+                                <i class="bi bi-zoom-in me-1 text-success"></i> View Photo
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Proof 3: Delivery Vehicle -->
+                    <div class="col-12 col-sm-6 col-md-4">
+                        <div class="card h-100 border rounded-3 p-2 text-center bg-white shadow-sm position-relative">
+                            <span class="badge bg-info bg-opacity-10 text-info small py-1 px-2 rounded-pill mb-2 fw-semibold">3. Transport Vehicle</span>
+                            <div class="ratio ratio-4x3 rounded-3 overflow-hidden border bg-light mb-2">
+                                <?php if (!empty($order['delivery_proof_vehicle'])): ?>
+                                    <img src="<?php echo BASE_URL; ?>/assets/images/delivery/<?php echo htmlspecialchars($order['delivery_proof_vehicle']); ?>" 
+                                         class="img-fluid object-fit-cover w-100 h-100 cursor-pointer proof-thumb" 
+                                         alt="Delivery Vehicle Proof"
+                                         onclick="showProofModal(this.src, 'Delivery Vehicle / Cargo Proof')"
+                                         onerror="this.src='https://placehold.co/300x225?text=Vehicle+Proof';">
+                                <?php else: ?>
+                                    <div class="d-flex align-items-center justify-content-center text-muted small">No Image</div>
+                                <?php endif; ?>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-light border rounded-pill w-100 small" onclick="showProofModal('<?php echo BASE_URL; ?>/assets/images/delivery/<?php echo htmlspecialchars($order['delivery_proof_vehicle']); ?>', 'Delivery Vehicle / Cargo Proof')">
+                                <i class="bi bi-zoom-in me-1 text-info"></i> View Photo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <!-- Order Items -->
         <div class="card border-0 shadow-sm rounded-4 mb-4">
             <div class="card-header bg-white border-0 pt-4 pb-0 px-4">
@@ -472,5 +578,29 @@ include __DIR__ . '/partials/header.php';
         </div>
     </div>
 </div>
+
+<!-- Fullscreen Proof Image Modal -->
+<div class="modal fade" id="proofViewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header py-3 px-4 border-0 bg-dark text-white">
+                <h6 class="modal-title fw-bold mb-0" id="proofModalTitle"><i class="bi bi-image me-2"></i>Dispatch Proof Photo</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0 text-center bg-black">
+                <img id="proofModalImg" src="" class="img-fluid" style="max-height: 80vh; width: auto; object-fit: contain;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showProofModal(src, title) {
+    document.getElementById('proofModalImg').src = src;
+    document.getElementById('proofModalTitle').innerHTML = '<i class="bi bi-image me-2"></i>' + title;
+    var modal = new bootstrap.Modal(document.getElementById('proofViewModal'));
+    modal.show();
+}
+</script>
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
